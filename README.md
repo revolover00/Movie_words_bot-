@@ -61,22 +61,42 @@ cp .env.example .env
 # fill in BOT_TOKEN, DATABASE_URL, GROQ_API_KEY
 ```
 
-### 5. Run locally (optional)
+### 5. Handle /start for free (Cloudflare Worker, no server)
+
+`bot.py` uses polling and needs a running process. For 24/7 free hosting
+with no server, deploy the included Cloudflare Worker (`worker.js`):
+
+```bash
+npm i -g wrangler
+wrangler login
+wrangler secret put BOT_TOKEN
+wrangler secret put DATABASE_URL
+wrangler deploy
+```
+
+Then point Telegram at it:
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WORKER_URL>"
+```
+
+For local testing you can still run `python bot.py` (polling) instead.
+
+### 6. Run locally (optional)
 
 ```bash
 pip install -r requirements.txt
 sudo apt-get install ffmpeg   # or: brew install ffmpeg
-python bot.py        # handles /start, /stop, /today (polling)
 python daily_job.py  # sends today's word immediately
 ```
 
-### 6. Automate with GitHub Actions
+### 7. Automate with GitHub Actions
 
 1. Push this repo to GitHub (public repo → free Actions minutes).
 2. Add secrets: **Settings → Secrets and variables → Actions** → `BOT_TOKEN`, `DATABASE_URL`, `GROQ_API_KEY`.
 3. The workflow in `.github/workflows/daily.yml` already runs daily at 6:00 AM UTC (≈ 9 AM Cairo in winter). You can also trigger it manually from the **Actions** tab.
 
-### 7. (Optional) Trigger via cron-job.org
+### 8. (Optional) Trigger via cron-job.org
 
 Create a free job on [cron-job.org](https://cron-job.org) that POSTs to:
 
@@ -103,15 +123,25 @@ The PAT needs `repo` scope (classic) or `actions:write` (fine-grained).
 ## Project structure
 
 ```
-bot.py               # Telegram bot (/start, /stop, /today)
+bot.py               # Telegram bot, /start etc. (polling, for local use)
+worker.js            # Cloudflare Worker webhook — free 24/7 /start hosting
 daily_job.py         # Daily broadcast pipeline
-youtube_free.py      # InnerTube search (no API key)
+youtube_free.py      # InnerTube search (+ yt-dlp fallback)
 clipper.py           # yt-dlp + FFmpeg clip cutting
-groq_meaning.py      # Groq meanings
+groq_meaning.py      # Groq meanings (with retries)
 words.py / words.txt # Word bank
 db.py / schema.sql   # Neon Postgres layer
 config.py            # Env config
-.github/workflows/daily.yml
+tests/               # pytest suite
+.github/workflows/daily.yml  # daily broadcast
+.github/workflows/test.yml   # CI tests on push
+```
+
+## Testing
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest -q
 ```
 
 ## Notes
