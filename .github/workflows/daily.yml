@@ -1,0 +1,36 @@
+name: Daily Word
+
+on:
+  schedule:
+    # 9:00 AM Cairo time (6:00 AM UTC in winter / 7:00 AM UTC in summer).
+    # GitHub cron is UTC-only, so this fires at 6:00 AM UTC year-round.
+    - cron: "0 6 * * *"
+  repository_dispatch:
+    types: [daily-word]
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Run daily job
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ vars.GROQ_MODEL || 'llama-3.1-8b-instant' }}
+        run: python daily_job.py
