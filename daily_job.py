@@ -15,7 +15,7 @@ from telegram import Bot
 import db
 import words as words_mod
 import youtube_free
-from clipper import get_clip
+from clipper import get_clip, get_clip_for_word
 from config import config
 from groq_meaning import get_meaning
 
@@ -31,12 +31,24 @@ def build_today_message() -> tuple[str, str]:
     word = words_mod.pick_word()
     meaning = get_meaning(word)
 
-    videos = youtube_free.search(f"{word} movie scene")
+    videos = youtube_free.search(f"{word} movie scene", max_results=5)
     if not videos:
         raise RuntimeError(f"No YouTube results for {word!r}")
-    video = videos[0]
 
-    clip_path = get_clip(video.video_id, word, config.clip_before, config.clip_after)
+    # Try videos in order until the word is actually spoken in one.
+    video = videos[0]
+    clip_path = None
+    for candidate in videos[:3]:
+        clip_path = get_clip_for_word(
+            candidate.video_id, word, config.clip_before, config.clip_after
+        )
+        if clip_path is not None:
+            video = candidate
+            break
+    if clip_path is None:
+        # No video contained the word — fall back to the first result.
+        log.warning("Word %r not found in any subtitles, using fallback clip", word)
+        clip_path = get_clip(video.video_id, word, config.clip_before, config.clip_after)
 
     caption = (
         f"🎬 كلمة النهاردة\n\n"

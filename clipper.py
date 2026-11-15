@@ -109,26 +109,43 @@ def download_clip(
     return out_path
 
 
+def get_clip_for_word(
+    video_id: str, word: str, before: int = 2, after: int = 3
+) -> Path | None:
+    """Download a clip only if `word` is found in the subtitles.
+
+    Returns None when the word is not in the subtitles, so the caller
+    can try the next search result instead of sending a random clip.
+    """
+    with tempfile.TemporaryDirectory(prefix="movie-word-") as td:
+        tmp = Path(td)
+        try:
+            cues = fetch_subtitles(video_id, tmp)
+        except subprocess.CalledProcessError as exc:
+            log.warning("Subtitle fetch failed for %s: %s", video_id, exc)
+            return None
+        hit = find_word_time(cues, word)
+        if not hit:
+            log.info("Word %r not in subtitles of %s", word, video_id)
+            return None
+        start = max(0.0, hit[0] - before)
+        end = hit[1] + after
+        log.info("Word %r found at %.1fs-%.1fs in %s", word, hit[0], hit[1], video_id)
+        out = Path("clips") / f"{video_id}_{int(start)}s.mp4"
+        out.parent.mkdir(exist_ok=True)
+        return download_clip(video_id, start, end, out)
+
+
 def get_clip(video_id: str, word: str, before: int = 2, after: int = 3) -> Path:
     """Full pipeline: subtitles -> timestamp -> clip file.
 
     Falls back to a 10-second clip from 0:30 if the word is not found.
+    Prefer `get_clip_for_word` + trying multiple videos for accuracy.
     """
-    with tempfile.TemporaryDirectory(prefix="movie-word-") as td:
-        tmp = Path(td)
-        start, end = 30.0, 40.0
-        try:
-            cues = fetch_subtitles(video_id, tmp)
-            hit = find_word_time(cues, word)
-            if hit:
-                start = max(0.0, hit[0] - before)
-                end = hit[1] + after
-                log.info("Word %r found at %.1fs-%.1fs", word, hit[0], hit[1])
-            else:
-                log.warning("Word %r not in subtitles, using fallback window", word)
-        except subprocess.CalledProcessError as exc:
-            log.warning("Subtitle fetch failed (%s), using fallback window", exc)
-
-        out = Path("clips") / f"{video_id}_{int(start)}s.mp4"
-        out.parent.mkdir(exist_ok=True)
-        return download_clip(video_id, start, end, out)
+    clip = get_clip_for_word(video_id, word, before, after)
+    if clip is not None:
+        return clip
+    log.warning("Using fallback window for %s", video_id)
+    out = Path("clips") / f"{video_id}_fallback.mp4"
+    out.parent.mkdir(exist_ok=True)
+    return download_clip(video_id, 30.0, 40.0, out)
