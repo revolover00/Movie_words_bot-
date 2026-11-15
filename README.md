@@ -1,1 +1,125 @@
-# Movie_words_bot-
+# Movie Word Bot 🎬
+
+A free, open-source Telegram bot that sends subscribers **one English word per day** with a **short movie clip** where the word is spoken, plus its meaning in Egyptian Arabic.
+
+> Learn English by watching movies — one word a day, zero cost, zero self-hosting.
+
+## How it works
+
+```
+cron-job.org (daily 9 AM Cairo)
+    │  POST → GitHub API (repository_dispatch)
+    ▼
+GitHub Actions (free ephemeral runner)
+    │
+    ▼
+daily_job.py
+    ├─ Groq API        → word meaning (Egyptian Arabic) + example
+    ├─ InnerTube       → search YouTube for "<word> movie scene" (no API key)
+    ├─ yt-dlp + FFmpeg → download subtitles, find the word, cut a short clip
+    ├─ Neon Postgres   → subscribers list + already-sent words
+    ▼
+Telegram Bot API       → send video + caption to all subscribers
+```
+
+New users subscribe via `/start` (handled by `bot.py` with long polling).
+
+## Stack
+
+| Tool | Role |
+| --- | --- |
+| cron-job.org | Daily alarm (HTTP POST) |
+| GitHub Actions | Free ephemeral worker |
+| Python + python-telegram-bot | The bot |
+| Neon (Postgres) | Database |
+| yt-dlp + FFmpeg | YouTube download + clip cutting |
+| Groq API (`llama-3.1-8b-instant`) | Word meanings |
+
+## Setup
+
+### 1. Create the Telegram bot
+
+Chat with [@BotFather](https://t.me/BotFather) → `/newbot` → copy the `BOT_TOKEN`.
+
+### 2. Create the database
+
+- Sign up at [Neon](https://neon.tech) (free, no credit card) → create a project → copy the **connection string** (`DATABASE_URL`).
+- Run the schema once:
+  ```bash
+  pip install -r requirements.txt
+  DATABASE_URL=postgresql://... python -m db
+  ```
+
+### 3. Get a Groq API key
+
+- Sign up at [Groq](https://console.groq.com) → API Keys → create key (`GROQ_API_KEY`).
+
+### 4. Configure
+
+```bash
+cp .env.example .env
+# fill in BOT_TOKEN, DATABASE_URL, GROQ_API_KEY
+```
+
+### 5. Run locally (optional)
+
+```bash
+pip install -r requirements.txt
+sudo apt-get install ffmpeg   # or: brew install ffmpeg
+python bot.py        # handles /start, /stop, /today (polling)
+python daily_job.py  # sends today's word immediately
+```
+
+### 6. Automate with GitHub Actions
+
+1. Push this repo to GitHub (public repo → free Actions minutes).
+2. Add secrets: **Settings → Secrets and variables → Actions** → `BOT_TOKEN`, `DATABASE_URL`, `GROQ_API_KEY`.
+3. The workflow in `.github/workflows/daily.yml` already runs daily at 6:00 AM UTC (≈ 9 AM Cairo in winter). You can also trigger it manually from the **Actions** tab.
+
+### 7. (Optional) Trigger via cron-job.org
+
+Create a free job on [cron-job.org](https://cron-job.org) that POSTs to:
+
+```
+https://api.github.com/repos/<OWNER>/<REPO>/dispatches
+```
+
+with header `Authorization: Bearer <PAT>` and body `{"event_type": "daily-word"}`.
+The PAT needs `repo` scope (classic) or `actions:write` (fine-grained).
+
+## Environment variables
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `BOT_TOKEN` | ✅ | — | Telegram bot token |
+| `DATABASE_URL` | ✅ | — | Neon Postgres connection string |
+| `GROQ_API_KEY` | ✅ | — | Groq API key |
+| `GROQ_MODEL` | | `llama-3.1-8b-instant` | Groq model |
+| `WORDS_FILE` | | `words.txt` | Word bank (one word per line) |
+| `CLIP_BEFORE` | | `2` | Seconds before the word |
+| `CLIP_AFTER` | | `3` | Seconds after the word |
+| `SEND_DELAY` | | `0.2` | Seconds between sends |
+
+## Project structure
+
+```
+bot.py               # Telegram bot (/start, /stop, /today)
+daily_job.py         # Daily broadcast pipeline
+youtube_free.py      # InnerTube search (no API key)
+clipper.py           # yt-dlp + FFmpeg clip cutting
+groq_meaning.py      # Groq meanings
+words.py / words.txt # Word bank
+db.py / schema.sql   # Neon Postgres layer
+config.py            # Env config
+.github/workflows/daily.yml
+```
+
+## Notes
+
+- **InnerTube** may need a `clientVersion` bump every few months when YouTube changes its API (see `youtube_free.py`).
+- Words are English by default; meanings come in Egyptian Arabic. To switch languages, edit `words.txt` and the prompt in `groq_meaning.py`.
+- Clips are short excerpts from YouTube for educational use.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
