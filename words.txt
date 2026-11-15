@@ -20,7 +20,6 @@ crystal
 puzzle
 treasure
 voyage
-whisper
 breathe
 believe
 achieve
