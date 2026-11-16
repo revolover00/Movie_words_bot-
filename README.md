@@ -61,10 +61,24 @@ cp .env.example .env
 # fill in BOT_TOKEN, DATABASE_URL, GROQ_API_KEY
 ```
 
-### 5. Handle /start for free (Cloudflare Worker, no server)
+### 5. Handle /start for free (Vercel, browser-only)
 
 `bot.py` uses polling and needs a running process. For 24/7 free hosting
-with no server, deploy the included Cloudflare Worker (`worker.js`):
+that works entirely from a phone browser:
+
+1. Open [vercel.com](https://vercel.com) → sign in with GitHub → **Add New → Project**
+   → import this repo. Framework preset: **Other**.
+2. Add environment variables: `BOT_TOKEN`, `DATABASE_URL`.
+3. Deploy. Then open this URL in your browser:
+
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-app>.vercel.app/api/telegram
+```
+
+Telegram replies `{"ok":true,...}` — done. The function in `api/telegram.js`
+handles `/start`, `/stop`, `/help`, `/today` and talks to Neon over TLS.
+
+### 5b. Alternative: Cloudflare Worker (needs a desktop/CLI)
 
 ```bash
 npm i -g wrangler
@@ -74,11 +88,7 @@ wrangler secret put DATABASE_URL
 wrangler deploy
 ```
 
-Then point Telegram at it:
-
-```bash
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WORKER_URL>"
-```
+Then point Telegram at `https://<worker-url>` the same way.
 
 For local testing you can still run `python bot.py` (polling) instead.
 
