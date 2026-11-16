@@ -1,8 +1,9 @@
 {
-  "name": "movie-word-bot-worker",
+  "name": "movie-word-bot",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.0"
+    "@neondatabase/serverless": "^0.10.0",
+    "pg": "^8.13.1"
   }
 }
