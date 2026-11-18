@@ -32,3 +32,18 @@ def test_result_audio_languages_are_indexed():
     parser = PageParser()
     parser.feed('<picture data-link="movie/a/"></picture><span aria-label="Audio: French, English"></span>')
     assert parser.audio_languages['movie/a/'] == {'french', 'english'}
+
+
+def test_search_includes_audio_and_transcript_language(monkeypatch, tmp_path):
+    import clip_cafe
+    from urllib.parse import urlparse, parse_qs
+    urls = []
+    def search(url):
+        urls.append(url)
+        return PageParser()
+    monkeypatch.setattr(clip_cafe, 'page', search)
+    import pytest
+    with pytest.raises(RuntimeError):
+        clip_cafe.find_clip('こんにちは', tmp_path, audio_language='ja')
+    assert parse_qs(urlparse(urls[0]).query)['audio'] == ['ja']
+    assert parse_qs(urlparse(urls[0]).query)['sl'] == ['ja']

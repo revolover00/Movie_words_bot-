@@ -21,7 +21,7 @@ with TemporaryDirectory() as out:
         except Exception as exc:
             results.append(f'{lang}:text={type(exc).__name__}')
         try:
-            clip = find_clip(phrase, Path(out), verify=lambda path, text: verify_audio(path, text, lang))
+            clip = find_clip(phrase, Path(out), verify=lambda path, text: verify_audio(path, text, lang), audio_language=lang)
             results.append(f'{lang}:audio=ok')
         except Exception as exc:
             results.append(f'{lang}:audio={type(exc).__name__}')
