@@ -93,3 +93,27 @@ def test_changed_settings_or_unsubscribe_prevents_delivery(monkeypatch):
     monkeypatch.setattr(daily_job, 'broadcast', send)
     asyncio.run(daily_job.run_due_subscribers([dict(chat_id=1, level='A2', learning_language='en', explanation_language='ar', settings_updated_at=None)]))
     send.assert_not_called()
+
+
+def test_localized_build_passes_correct_verifier_and_language(monkeypatch, tmp_path):
+    from preferences import LANGUAGES
+    import multilingual
+    import clip_cafe
+    path = tmp_path / 'sample.mp4'
+    path.write_bytes(b'fake')
+    checked = []
+    monkeypatch.setattr(daily_job.db, 'phrase_history', lambda *args: (set(), []))
+    monkeypatch.setattr(multilingual, 'expressions', lambda *args: [('example phrase', 'greeting')])
+    monkeypatch.setattr(multilingual, 'meaning', lambda text, learning, explanation, level: f'{learning}/{explanation}/{level}')
+    monkeypatch.setattr(multilingual, 'verify_audio', lambda p, phrase, lang: checked.append((p, phrase, lang)) or True)
+    def find(text, *, verify, audio_language):
+        assert verify(path, text)
+        assert checked[-1][2] == audio_language
+        return SimpleNamespace(path=path, clip_id='id', title='Movie', url='https://clip.cafe/movie/')
+    monkeypatch.setattr(clip_cafe, 'find_clip', find)
+    for entry in LANGUAGES:
+        lang = entry['code']
+        phrase, clip, caption = daily_job.build_localized_message('A2', lang, 'ar')
+        assert phrase.text in caption
+        assert f'{lang}/ar/A2' in caption
+        assert checked[-1][2] == lang
