@@ -39,6 +39,13 @@ def build_localized_message(level: str, learning: str, explanation: str):
     seen, topics = db.phrase_history(level, learning)
     if learning == 'en':
         candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]
+        # Once the finite curated bank is exhausted, try new generated
+        # expressions before recycling the bank. Clip audio is still verified.
+        if all(p.text.casefold() in seen for p in phrases.BANK[level]):
+            try:
+                candidates = multilingual.expressions(learning, level, seen, topics) + candidates
+            except Exception:
+                log.warning('Could not generate fresh English expressions; using curated bank')
     else:
         candidates = multilingual.expressions(learning, level, seen, topics)
     for text, topic in candidates:
