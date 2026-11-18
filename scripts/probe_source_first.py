@@ -12,7 +12,8 @@ language = sys.argv[1]
 seed = source_first.SEEDS[language][0]
 original = clip_cafe.find_clip
 with TemporaryDirectory() as tmp, \
-     patch.dict(source_first.SEEDS, {language: (seed,)}), \
+     patch.dict(source_first.SEEDS, {language: (() if language == 'hi' else (seed,))}), \
+     patch.object(source_first.random, 'shuffle', lambda seeds: None), \
      patch.object(clip_cafe, 'find_clip', side_effect=lambda text, **kw: original(text, Path(tmp), **kw)):
     try:
         (text, topic), clip = source_first.find_expression_clip(language, 'A2', set(), [])
