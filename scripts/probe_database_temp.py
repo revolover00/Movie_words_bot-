@@ -20,6 +20,19 @@ try:
         assert set(users) == {111, 222}
         assert users[111]['learning_language'] == 'en' and users[111]['explanation_language'] == 'ar'
         assert db.still_due_with_settings(users[222])
+        with conn.cursor() as cur:
+            cur.execute("UPDATE subscriber_preferences SET updated_at = updated_at + interval '1 second' WHERE chat_id = 222")
+        conn.commit()
+        assert not db.still_due_with_settings(users[222])
+        assert not db.advance_due_after_delivery(222, users[222]['settings_updated_at'])
+        users = {u['chat_id']: u for u in db.due_subscribers()}
+        with conn.cursor() as cur:
+            cur.execute("UPDATE subscribers SET level = 'C1' WHERE chat_id = 222")
+        conn.commit()
+        assert not db.still_due_with_settings(users[222])
+        with conn.cursor() as cur:
+            cur.execute("UPDATE subscribers SET level = 'B1' WHERE chat_id = 222")
+        conn.commit()
         assert db.advance_due_after_delivery(222, users[222]['settings_updated_at'])
         assert not db.still_due_with_settings(users[222])
         assert db.advance_due_after_delivery(111, None)
