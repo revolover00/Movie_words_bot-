@@ -16,7 +16,7 @@ GitHub Actions (free ephemeral runner)
 daily_job.py
     ├─ Curated phrases → expression for each active CEFR level
     ├─ Groq API        → Egyptian Arabic explanation + example
-    ├─ Yarn            → find a movie quote containing the expression and download its clip
+    ├─ Clip.Cafe       → find a quote containing the expression and download its clip
     ├─ Neon Postgres   → subscriber levels + sent expressions
     ▼
 Telegram Bot API       → send each level’s clip to its subscribers
@@ -32,7 +32,7 @@ New users subscribe with `/start` and pick a level. `/level` changes it at any t
 | GitHub Actions | Free ephemeral worker |
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
-| Yarn | Movie quote search and short clips |
+| Clip.Cafe | Movie quote search and short clips |
 | Groq API (`qwen/qwen3.8-27b`) | Explanations and examples |
 
 ## Setup
@@ -136,7 +136,8 @@ bot.py               # Telegram bot, /start etc. (polling, for local use)
 worker.js            # Cloudflare Worker webhook — free 24/7 /start hosting
 daily_job.py         # Daily broadcast pipeline
 phrases.py           # CEFR-labelled expressions and topics
-yarn_clips.py        # Yarn movie quote search and clip download
+clip_cafe.py         # Movie quote search and clip download
+yarn_clips.py        # Legacy Yarn integration
 youtube_free.py      # Legacy InnerTube search
 clipper.py           # yt-dlp + FFmpeg clip cutting
 groq_meaning.py      # Groq meanings (with retries)
@@ -157,9 +158,9 @@ python -m pytest -q
 
 ## Notes
 
-- Yarn integration parses public web pages, which may change or become unavailable.
+- Clip.Cafe integration parses public web pages, which may change or become unavailable.
 - Words are English by default; meanings come in Egyptian Arabic. To switch languages, edit `words.txt` and the prompt in `groq_meaning.py`.
-- Clips are short excerpts from Yarn for educational use.
+- Clips are short excerpts from Clip.Cafe for educational use.
 
 ## License
 

@@ -8,7 +8,7 @@ from telegram import Bot
 
 import db
 import phrases
-import yarn_clips
+import clip_cafe
 from config import config
 from groq_meaning import get_meaning
 
@@ -21,7 +21,7 @@ def build_message(level: str):
     seen, recent_topics = db.phrase_history(level)
     for expression in phrases.candidates(level, seen, recent_topics):
         try:
-            clip = yarn_clips.find_clip(expression.text)
+            clip = clip_cafe.find_clip(expression.text)
         except RuntimeError as exc:
             log.info('No matching clip for %r: %s', expression.text, exc)
             continue
