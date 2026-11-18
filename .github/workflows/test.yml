@@ -20,3 +20,19 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: node --test tests/telegram.test.js
+
+  temporary-end-to-end:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/maintenance/audio-probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: pip install -r requirements.txt
+      - run: python scripts/probe_end_to_end_temp.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
