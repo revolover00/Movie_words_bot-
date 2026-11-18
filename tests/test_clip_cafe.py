@@ -62,3 +62,16 @@ def test_search_falls_back_without_duplicate_clips(monkeypatch):
     assert list(clip_cafe.search_links('hola', 'es')) == ['a', 'b', 'c']
     assert calls[0]['audio'] == ['es']
     assert 'audio' not in calls[1]
+
+
+def test_search_language_can_differ_from_audio(monkeypatch):
+    import clip_cafe
+    from urllib.parse import parse_qs, urlparse
+    urls = []
+    def search(url):
+        urls.append(url)
+        return PageParser()
+    monkeypatch.setattr(clip_cafe, 'page', search)
+    list(clip_cafe.search_links('thank you', 'hi', 'en'))
+    query = parse_qs(urlparse(urls[0]).query)
+    assert query['audio'] == ['hi'] and query['sl'] == ['en']

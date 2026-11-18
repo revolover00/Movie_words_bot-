@@ -23,10 +23,27 @@ def test_source_first_never_accepts_wrong_language_or_phrase(monkeypatch, tmp_pa
     import pytest
     monkeypatch.setattr(source_first, 'SEEDS', {'ja': ('こんにちは',)})
     monkeypatch.setattr(source_first.multilingual, 'transcript_for_language', lambda *args: 'さようなら')
-    def search(seed, verify, audio_language):
+    monkeypatch.setattr(source_first.random, 'shuffle', lambda x: None)
+    monkeypatch.setattr(source_first, 'extract_expression', lambda *args: None)
+    def search(seed, verify, audio_language, search_language):
         assert audio_language == 'ja'
         assert not verify(tmp_path / 'test.mp4', seed)
         raise RuntimeError('none')
     monkeypatch.setattr(source_first.clip_cafe, 'find_clip', search)
     with pytest.raises(RuntimeError):
         source_first.find_expression_clip('ja', 'A2', set(), [])
+
+
+def test_english_search_can_select_verified_target_audio(monkeypatch, tmp_path):
+    monkeypatch.setattr(source_first, 'SEEDS', {'hi': ()})
+    monkeypatch.setattr(source_first.random, 'shuffle', lambda x: None)
+    monkeypatch.setattr(source_first.multilingual, 'transcript_for_language', lambda *args: 'बहुत बहुत धन्यवाद')
+    monkeypatch.setattr(source_first, 'extract_expression', lambda *args: ('बहुत बहुत धन्यवाद', 'gratitude'))
+    clip = object()
+    def search(seed, verify, audio_language, search_language):
+        assert audio_language == 'hi' and search_language == 'en'
+        assert verify(tmp_path / 'test.mp4', seed)
+        return clip
+    monkeypatch.setattr(source_first.clip_cafe, 'find_clip', search)
+    expression, found = source_first.find_expression_clip('hi', 'A2', set(), [])
+    assert expression[0] == 'बहुत बहुत धन्यवाद' and found is clip

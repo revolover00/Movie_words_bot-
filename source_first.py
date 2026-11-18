@@ -54,19 +54,22 @@ def extract_expression(transcript: str, language: str, level: str, seen: set[str
 def find_expression_clip(language: str, level: str, seen: set[str], topics: list[str]):
     """Find a real clip first, then select a transcript-verified expression."""
     validate_language(language)
-    seeds = list(SEEDS.get(language, ()))
+    seeds = [(seed, language) for seed in SEEDS.get(language, ())]
+    # English subtitles can locate a scene even where the site's target-language
+    # subtitle index is sparse (notably Hindi); audio is independently checked.
+    seeds += [(seed, 'en') for seed in ('thank you', 'what happened', 'i dont know', 'lets go')]
     random.shuffle(seeds)
-    for seed in seeds:
+    for seed, search_language in seeds:
         chosen = None
         def verify(path, search):
             nonlocal chosen
             transcript = multilingual.transcript_for_language(path, language)
-            if transcript is None or not clip_cafe.matches(search, transcript):
+            if transcript is None or (search_language == language and not clip_cafe.matches(search, transcript)):
                 return False
             chosen = extract_expression(transcript, language, level, seen, topics)
             return chosen is not None
         try:
-            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language)
+            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language, search_language=search_language)
         except RuntimeError:
             continue
         if chosen is not None:
