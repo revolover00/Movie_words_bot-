@@ -20,3 +20,10 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: node --test tests/telegram.test.js
+
+  inspect-source:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/arena/e5deedb5-movie-words-bot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/inspect_search_filters.py
