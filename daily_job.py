@@ -10,6 +10,7 @@ import db
 import phrases
 import clip_cafe
 import multilingual
+import source_first
 from config import config
 from groq_meaning import get_meaning
 
@@ -34,9 +35,24 @@ def build_message(level: str):
     raise RuntimeError(f'No matching movie clip for level {level}')
 
 
+def localized_caption(text: str, clip, level: str, learning: str, explanation: str) -> str:
+    meaning = multilingual.meaning(text, learning, explanation, level)
+    caption = f'🎬 {level} · {learning.upper()}\n\n{text}\n\n{meaning}\n\n🎞️ {clip.title}\n🔗 {clip.url}'
+    if len(caption) > 1024:
+        raise ValueError('Telegram video caption exceeds 1024 characters')
+    return caption
+
+
 def build_localized_message(level: str, learning: str, explanation: str):
     """Find an expression and verify its audio before producing a caption."""
     seen, topics = db.phrase_history(level, learning)
+    if learning in source_first.SEEDS:
+        try:
+            (text, topic), clip = source_first.find_expression_clip(learning, level, seen, topics)
+        except RuntimeError:
+            log.info('No suitable expression found in sampled %s audio', learning)
+        else:
+            return phrases.Phrase(text, topic), clip, localized_caption(text, clip, level, learning, explanation)
     if learning == 'en':
         candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]
         # Once the finite curated bank is exhausted, try new generated
@@ -56,11 +72,7 @@ def build_localized_message(level: str, learning: str, explanation: str):
         except RuntimeError:
             log.info('No verified audio found for expression %r', text)
             continue
-        meaning = multilingual.meaning(text, learning, explanation, level)
-        caption = f'🎬 {level} · {learning.upper()}\n\n{text}\n\n{meaning}\n\n🎞️ {clip.title}\n🔗 {clip.url}'
-        if len(caption) > 1024:
-            raise ValueError('Telegram video caption exceeds 1024 characters')
-        return phrases.Phrase(text, topic), clip, caption
+        return phrases.Phrase(text, topic), clip, localized_caption(text, clip, level, learning, explanation)
     raise RuntimeError(f'No verified clip for {level}/{learning}')
 
 

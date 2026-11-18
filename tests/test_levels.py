@@ -103,6 +103,7 @@ def test_localized_build_passes_correct_verifier_and_language(monkeypatch, tmp_p
     path.write_bytes(b'fake')
     checked = []
     monkeypatch.setattr(daily_job.db, 'phrase_history', lambda *args: (set(), []))
+    monkeypatch.setattr(daily_job.source_first, 'find_expression_clip', lambda *args: (_ for _ in ()).throw(RuntimeError('none')))
     monkeypatch.setattr(multilingual, 'expressions', lambda *args: [('example phrase', 'greeting')])
     monkeypatch.setattr(multilingual, 'meaning', lambda text, learning, explanation, level: f'{learning}/{explanation}/{level}')
     monkeypatch.setattr(multilingual, 'verify_audio', lambda p, phrase, lang: checked.append((p, phrase, lang)) or True)
@@ -134,3 +135,13 @@ def test_exhausted_english_bank_tries_new_generated_expressions(monkeypatch, tmp
     result, _, _ = daily_job.build_localized_message('A2', 'en', 'ar')
     assert result.text == 'A fresh sentence'
     assert seen_queries == ['A fresh sentence']
+
+
+def test_source_first_build_uses_verified_selected_expression(monkeypatch):
+    monkeypatch.setattr(daily_job.db, 'phrase_history', lambda *args: (set(), []))
+    clip = SimpleNamespace(path='/clip', clip_id='id', title='Movie', url='https://clip.cafe/movie/')
+    monkeypatch.setattr(daily_job.source_first, 'find_expression_clip', lambda *args: (('これは何ですか', 'questions'), clip))
+    monkeypatch.setattr(daily_job.multilingual, 'meaning', lambda *args: 'meaning')
+    expression, found, caption = daily_job.build_localized_message('A2', 'ja', 'ar')
+    assert expression.text == 'これは何ですか' and found is clip
+    assert expression.text in caption and 'meaning' in caption
