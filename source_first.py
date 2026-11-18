@@ -59,7 +59,8 @@ def find_expression_clip(language: str, level: str, seen: set[str], topics: list
     # subtitle index is sparse (notably Hindi); audio is independently checked.
     seeds += [(seed, 'en') for seed in ('thank you', 'what happened', 'i dont know', 'lets go')]
     random.shuffle(seeds)
-    for seed, search_language in seeds:
+    # Bound the search per run so one difficult language cannot stall all users.
+    for seed, search_language in seeds[:2]:
         chosen = None
         def verify(path, search):
             nonlocal chosen
@@ -69,7 +70,7 @@ def find_expression_clip(language: str, level: str, seen: set[str], topics: list
             chosen = extract_expression(transcript, language, level, seen, topics)
             return chosen is not None
         try:
-            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language, search_language=search_language)
+            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language, search_language=search_language, max_results=5)
         except RuntimeError:
             continue
         if chosen is not None:
