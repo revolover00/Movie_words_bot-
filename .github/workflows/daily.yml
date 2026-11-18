@@ -10,6 +10,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: movie-expressions
+  cancel-in-progress: false
+
 jobs:
   probe-yarn:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.probe_yarn }}

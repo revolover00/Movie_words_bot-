@@ -1,78 +1,83 @@
-"""Daily job: pick a word, get its meaning, fetch a movie clip, broadcast.
-
-Run with:  python daily_job.py
-Triggered daily by GitHub Actions (see .github/workflows/daily.yml).
-"""
-
+"""Send one matching movie expression to each subscribed CEFR-level group."""
 from __future__ import annotations
 
 import asyncio
 import logging
-import time
 
 from telegram import Bot
 
 import db
-import words as words_mod
+import phrases
 import yarn_clips
 from config import config
 from groq_meaning import get_meaning
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
 
 
-def build_today_message() -> tuple[str, str, str, yarn_clips.YarnClip]:
-    """Build the clip and caption for a fresh word without marking it sent."""
-    word = words_mod.pick_word()
-    meaning = get_meaning(word)
-
-    clip = yarn_clips.find_clip(word)
-
-    caption = (
-        f"🎬 كلمة النهاردة\n\n"
-        f"{meaning}\n\n"
-        f"🎞️ من: {clip.title}\n"
-        f"🔗 {clip.url}"
-    )
-    return str(clip.path), caption, word, clip
-
-
-async def broadcast(clip_path: str, caption: str) -> tuple[int, int]:
-    """Send the clip to all active subscribers. Returns (sent, failed)."""
-    config.validate("bot_token")
-    bot = Bot(token=config.bot_token)
-    subscribers = db.list_subscribers()
-    sent = failed = 0
-    for sub in subscribers:
-        chat_id = sub["chat_id"]
+def build_message(level: str):
+    """Select an unseen expression with a real matching movie clip."""
+    seen, recent_topics = db.phrase_history(level)
+    for expression in phrases.candidates(level, seen, recent_topics):
         try:
-            with open(clip_path, "rb") as f:
-                await bot.send_video(chat_id=chat_id, video=f, caption=caption)
+            clip = yarn_clips.find_clip(expression.text)
+        except RuntimeError as exc:
+            log.info('No matching clip for %r: %s', expression.text, exc)
+            continue
+        meaning = get_meaning(expression.text, level=level, topic=expression.topic)
+        caption = f"🎬 تعبير {level}\n\n{meaning}\n\n🎞️ من: {clip.title}\n🔗 {clip.url}"
+        if len(caption) > 1024:
+            raise ValueError('Telegram video caption exceeds 1024 characters')
+        return expression, clip, caption
+    raise RuntimeError(f'No matching movie clip for level {level}')
+
+
+async def broadcast(bot: Bot, chat_ids: list[int], clip_path: str, caption: str) -> tuple[int, int]:
+    sent = failed = 0
+    for chat_id in chat_ids:
+        try:
+            with open(clip_path, 'rb') as video:
+                await bot.send_video(chat_id=chat_id, video=video, caption=caption)
             sent += 1
-        except Exception as exc:  # noqa: BLE001 - one bad chat must not stop the rest
-            log.warning("Send to %s failed: %s", chat_id, exc)
+        except Exception as exc:  # one blocked chat must not stop the group
+            log.warning('Send to %s failed: %s', chat_id, exc)
             failed += 1
-        time.sleep(config.send_delay)
+        await asyncio.sleep(config.send_delay)
     return sent, failed
 
 
+async def run_groups(groups: dict[str, list[int]]) -> None:
+    bot = Bot(token=config.bot_token)
+    failures = []
+    for level in phrases.LEVELS:
+        chat_ids = groups.get(level, [])
+        if not chat_ids:
+            continue
+        try:
+            expression, clip, caption = build_message(level)
+            sent, failed = await broadcast(bot, chat_ids, str(clip.path), caption)
+            log.info('Level %s: %d sent, %d failed', level, sent, failed)
+            if sent:
+                db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title)
+            else:
+                raise RuntimeError('Failed to send to any subscriber')
+        except Exception:
+            log.exception('Failed to process level %s', level)
+            failures.append(level)
+    if failures:
+        raise RuntimeError('Failed levels: ' + ', '.join(failures))
+
+
 def main() -> None:
-    config.validate("database_url", "bot_token", "groq_api_key")
+    config.validate('database_url', 'bot_token', 'groq_api_key')
     db.init_db()
-    clip_path, caption, word, clip = build_today_message()
-    sent, failed = asyncio.run(broadcast(clip_path, caption))
-    log.info("Broadcast done: %d sent, %d failed", sent, failed)
-    if sent:
-        db.mark_sent(word, clip.clip_id, clip.title)
-    elif failed:
-        raise RuntimeError("Failed to send the clip to every subscriber")
-    else:
-        log.warning("No active subscribers; word not marked as sent")
+    groups = db.active_subscribers_by_level()
+    if not groups:
+        log.info('No active subscribers; no messages sent')
+        return
+    asyncio.run(run_groups(groups))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -11,7 +11,9 @@ from config import config
 log = logging.getLogger(__name__)
 
 PROMPT = """You are a friendly English teacher for Egyptian learners.
-Word: "{word}"
+English expression: "{word}"
+Learner level: {level}
+Topic: {topic}
 
 Reply with exactly this format (no extra text):
 📖 {word} = المعنى بالمصري
@@ -21,7 +23,7 @@ Keep the example short and from everyday / movie-style English.
 """
 
 
-def get_meaning(word: str, retries: int = 3) -> str:
+def get_meaning(word: str, retries: int = 3, *, level: str = "B1", topic: str = "everyday life") -> str:
     """Return the formatted meaning block for `word` (with retries)."""
     import time
 
@@ -32,7 +34,7 @@ def get_meaning(word: str, retries: int = 3) -> str:
         try:
             res = client.chat.completions.create(
                 model=config.groq_model,
-                messages=[{"role": "user", "content": PROMPT.format(word=word)}],
+                messages=[{"role": "user", "content": PROMPT.format(word=word, level=level, topic=topic)}],
                 temperature=0.3,
                 max_tokens=200,
             )
