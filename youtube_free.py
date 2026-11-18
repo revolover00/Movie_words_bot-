@@ -143,16 +143,51 @@ def _extract_videos(payload: dict) -> list[Video]:
     return out
 
 
-def search(query: str, max_results: int = 5) -> list[Video]:
-    """Search YouTube for `query` and return up to `max_results` videos."""
-    res = requests.post(
-        f"{INNERTUBE}/search?prettyPrint=false",
-        headers=HEADERS,
-        json={"context": {"client": CLIENT}, "query": query},
-        timeout=30,
+def _search_via_ytdlp(query: str, max_results: int) -> list[Video]:
+    """Fallback search via yt-dlp (used when InnerTube breaks)."""
+    import subprocess
+
+    res = subprocess.run(
+        [
+            "yt-dlp",
+            "--flat-playlist",
+            "--print", "%(id)s\t%(title)s\t%(channel)s",
+            f"ytsearch{max_results}:{query}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
-    if not res.ok:
-        raise RuntimeError(f"YouTube search failed: HTTP {res.status_code}")
-    videos = _extract_videos(res.json())
-    log.info("Search %r -> %d videos", query, len(videos))
-    return videos[:max_results]
+    videos: list[Video] = []
+    for line in res.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 2 or not parts[0]:
+            continue
+        videos.append(Video(parts[0], parts[1], parts[2] if len(parts) > 2 else ""))
+    log.info("yt-dlp fallback search %r -> %d videos", query, len(videos))
+    return videos
+
+
+def search(query: str, max_results: int = 5) -> list[Video]:
+    """Search YouTube for `query` and return up to `max_results` videos.
+
+    Tries InnerTube first; falls back to yt-dlp search when InnerTube
+    fails (YouTube changes its API without notice).
+    """
+    try:
+        res = requests.post(
+            f"{INNERTUBE}/search?prettyPrint=false",
+            headers=HEADERS,
+            json={"context": {"client": CLIENT}, "query": query},
+            timeout=30,
+        )
+        if not res.ok:
+            raise RuntimeError(f"YouTube search failed: HTTP {res.status_code}")
+        videos = _extract_videos(res.json())
+        if videos:
+            log.info("Search %r -> %d videos", query, len(videos))
+            return videos[:max_results]
+        log.warning("InnerTube returned no videos, trying yt-dlp fallback")
+    except (requests.RequestException, RuntimeError) as exc:
+        log.warning("InnerTube search failed (%s), trying yt-dlp fallback", exc)
+    return _search_via_ytdlp(query, max_results)

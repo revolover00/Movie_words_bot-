@@ -1,39 +1,39 @@
 # Movie Word Bot 🎬
 
-A free, open-source Telegram bot that sends subscribers **one English word per day** with a **short movie clip** where the word is spoken, plus its meaning in Egyptian Arabic.
+A free, open-source Telegram bot that sends useful English expressions with a matching short movie clip and an Egyptian Arabic explanation. Subscribers choose a CEFR level from A2 through C2.
 
-> Learn English by watching movies — one word a day, zero cost, zero self-hosting.
+> Learn English by watching movies — expressions for your level, zero self-hosting.
 
 ## How it works
 
 ```
-cron-job.org (daily 9 AM Cairo)
+cron-job.org (every 3 hours)
     │  POST → GitHub API (repository_dispatch)
     ▼
 GitHub Actions (free ephemeral runner)
     │
     ▼
 daily_job.py
-    ├─ Groq API        → word meaning (Egyptian Arabic) + example
-    ├─ InnerTube       → search YouTube for "<word> movie scene" (no API key)
-    ├─ yt-dlp + FFmpeg → download subtitles, find the word, cut a short clip
-    ├─ Neon Postgres   → subscribers list + already-sent words
+    ├─ Curated phrases → expression for each active CEFR level
+    ├─ Groq API        → Egyptian Arabic explanation + example
+    ├─ Clip.Cafe       → find a quote containing the expression and download its clip
+    ├─ Neon Postgres   → subscriber levels + sent expressions
     ▼
-Telegram Bot API       → send video + caption to all subscribers
+Telegram Bot API       → send each level’s clip to its subscribers
 ```
 
-New users subscribe via `/start` (handled by `bot.py` with long polling).
+New users subscribe with `/start` and pick a level. `/level` changes it at any time, `/today` shows the latest expression for that level, and `/stop` unsubscribes. Existing subscribers default to A2 and keep their subscription. CEFR labels are approximate, and the curated bank rotates topics and avoids repeats until exhausted.
 
 ## Stack
 
 | Tool | Role |
 | --- | --- |
-| cron-job.org | Daily alarm (HTTP POST) |
+| cron-job.org | Every 3 hours (HTTP POST) |
 | GitHub Actions | Free ephemeral worker |
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
-| yt-dlp + FFmpeg | YouTube download + clip cutting |
-| Groq API (`llama-3.1-8b-instant`) | Word meanings |
+| Clip.Cafe | Movie quote search and short clips |
+| Groq API (`qwen/qwen3.8-27b`) | Explanations and examples |
 
 ## Setup
 
@@ -61,31 +61,60 @@ cp .env.example .env
 # fill in BOT_TOKEN, DATABASE_URL, GROQ_API_KEY
 ```
 
-### 5. Run locally (optional)
+### 5. Handle /start for free (Vercel, browser-only)
+
+`bot.py` uses polling and needs a running process. For 24/7 free hosting
+that works entirely from a phone browser:
+
+1. Open [vercel.com](https://vercel.com) → sign in with GitHub → **Add New → Project**
+   → import this repo. Framework preset: **Other**.
+2. Add environment variables: `BOT_TOKEN`, `DATABASE_URL`.
+3. Deploy. Then open this URL in your browser:
+
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-app>.vercel.app/api/telegram
+```
+
+Telegram replies `{"ok":true,...}` — done. The function in `api/telegram.js`
+handles `/start`, `/level`, `/stop`, `/help`, `/today` and talks to Neon over TLS. The webhook and the scheduled job apply the additive level/history migration automatically.
+
+### 5b. Legacy Cloudflare Worker (does not support levels)
+
+```bash
+npm i -g wrangler
+wrangler login
+wrangler secret put BOT_TOKEN
+wrangler secret put DATABASE_URL
+wrangler deploy
+```
+
+This legacy worker does not implement level selection; use the Vercel webhook above for this version.
+
+For local testing you can still run `python bot.py` (polling) instead.
+
+### 6. Run locally (optional)
 
 ```bash
 pip install -r requirements.txt
-sudo apt-get install ffmpeg   # or: brew install ffmpeg
-python bot.py        # handles /start, /stop, /today (polling)
-python daily_job.py  # sends today's word immediately
+python daily_job.py  # sends one expression to each active level group
 ```
 
-### 6. Automate with GitHub Actions
+### 7. Automate with GitHub Actions
 
 1. Push this repo to GitHub (public repo → free Actions minutes).
 2. Add secrets: **Settings → Secrets and variables → Actions** → `BOT_TOKEN`, `DATABASE_URL`, `GROQ_API_KEY`.
-3. The workflow in `.github/workflows/daily.yml` already runs daily at 6:00 AM UTC (≈ 9 AM Cairo in winter). You can also trigger it manually from the **Actions** tab.
+3. Merge the workflow into the default branch. You can also trigger it manually from the **Actions** tab.
 
-### 7. (Optional) Trigger via cron-job.org
+### 8. Schedule via cron-job.org
 
-Create a free job on [cron-job.org](https://cron-job.org) that POSTs to:
+Create a free job on [cron-job.org](https://cron-job.org) scheduled every 3 hours that POSTs to:
 
 ```
 https://api.github.com/repos/<OWNER>/<REPO>/dispatches
 ```
 
-with header `Authorization: Bearer <PAT>` and body `{"event_type": "daily-word"}`.
-The PAT needs `repo` scope (classic) or `actions:write` (fine-grained).
+with headers `Authorization: Bearer <PAT>`, `Accept: application/vnd.github+json`, and `Content-Type: application/json`, and body `{"event_type": "daily-word"}`.
+The PAT needs `repo` scope (classic) or repository Contents read and write permission (fine-grained). The workflow must exist on the default branch. Store the token only in the scheduler, not in the repository.
 
 ## Environment variables
 
@@ -94,7 +123,7 @@ The PAT needs `repo` scope (classic) or `actions:write` (fine-grained).
 | `BOT_TOKEN` | ✅ | — | Telegram bot token |
 | `DATABASE_URL` | ✅ | — | Neon Postgres connection string |
 | `GROQ_API_KEY` | ✅ | — | Groq API key |
-| `GROQ_MODEL` | | `llama-3.1-8b-instant` | Groq model |
+| `GROQ_MODEL` | | `qwen/qwen3.8-27b` | Groq model |
 | `WORDS_FILE` | | `words.txt` | Word bank (one word per line) |
 | `CLIP_BEFORE` | | `2` | Seconds before the word |
 | `CLIP_AFTER` | | `3` | Seconds after the word |
@@ -103,22 +132,35 @@ The PAT needs `repo` scope (classic) or `actions:write` (fine-grained).
 ## Project structure
 
 ```
-bot.py               # Telegram bot (/start, /stop, /today)
+bot.py               # Telegram bot, /start etc. (polling, for local use)
+worker.js            # Cloudflare Worker webhook — free 24/7 /start hosting
 daily_job.py         # Daily broadcast pipeline
-youtube_free.py      # InnerTube search (no API key)
+phrases.py           # CEFR-labelled expressions and topics
+clip_cafe.py         # Movie quote search and clip download
+yarn_clips.py        # Legacy Yarn integration
+youtube_free.py      # Legacy InnerTube search
 clipper.py           # yt-dlp + FFmpeg clip cutting
-groq_meaning.py      # Groq meanings
+groq_meaning.py      # Groq meanings (with retries)
 words.py / words.txt # Word bank
 db.py / schema.sql   # Neon Postgres layer
 config.py            # Env config
-.github/workflows/daily.yml
+tests/               # pytest suite
+.github/workflows/daily.yml  # daily broadcast
+.github/workflows/test.yml   # CI tests on push
+```
+
+## Testing
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest -q
 ```
 
 ## Notes
 
-- **InnerTube** may need a `clientVersion` bump every few months when YouTube changes its API (see `youtube_free.py`).
+- Clip.Cafe integration parses public web pages, which may change or become unavailable.
 - Words are English by default; meanings come in Egyptian Arabic. To switch languages, edit `words.txt` and the prompt in `groq_meaning.py`.
-- Clips are short excerpts from YouTube for educational use.
+- Clips are short excerpts from Clip.Cafe for educational use.
 
 ## License
 
