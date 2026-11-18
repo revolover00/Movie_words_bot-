@@ -1,5 +1,6 @@
 """Validate public alternate audio tracks with Whisper; never sends messages."""
 import sys
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -16,9 +17,12 @@ with TemporaryDirectory() as out:
     try:
         if not hls_clips.download_localized(slug, lang, path):
             raise RuntimeError('HLS download failed')
-        transcript = multilingual.transcript_for_language(path, lang)
-        if not transcript:
-            raise RuntimeError('Audio language detection failed')
-        print(f'::notice title=Localized audio {lang}::Verified spoken language; seed match={not phrase or multilingual.matches(phrase, transcript)}; {len(transcript)} characters', flush=True)
+        stream = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries',
+                                 'stream_tags=language', '-of', 'json', str(path)], capture_output=True, text=True, timeout=15)
+        with path.open('rb') as f:
+            transcript = multilingual.client().audio.transcriptions.create(model='whisper-large-v3-turbo', file=f, response_format='verbose_json', temperature=0)
+        detected = getattr(transcript, 'language', '')
+        text = getattr(transcript, 'text', '')
+        print(f'::notice title=Localized audio {lang}::Detected={detected}; ffprobe={stream.stdout.strip()}; seed match={not phrase or multilingual.matches(phrase, text)}; transcript length={len(text)}', flush=True)
     except Exception as exc:
         print(f'::warning title=Localized audio {lang} unavailable::{type(exc).__name__}: {str(exc)[:200]}', flush=True)
