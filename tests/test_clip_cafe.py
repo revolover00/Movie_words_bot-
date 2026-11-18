@@ -11,6 +11,8 @@ def test_multilingual_matching_and_non_latin_text():
     assert matches('Comment ça va', 'Bonjour ! Comment ça va ?')
     assert matches('¿Cómo estás?', 'Hola, como estas?')
     assert matches('كيف حالك', 'مرحبا، كيف حالك؟')
+    assert matches('कैसे हो', 'नमस्ते, कैसे हो?')
+    assert not matches('कैसे हो', 'नमस्ते, किस हो?')
     assert matches('你好', '你好朋友！')
     assert matches('ありがとうございます', '本当にありがとうございます。')
     assert not matches('привет', 'пока друг')
