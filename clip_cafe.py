@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import unicodedata
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -113,8 +114,11 @@ def search_links(phrase: str, audio_language: str | None, search_language: str |
                 yield link
 
 
-def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None, search_language: str | None = None, max_results: int = 15) -> Clip:
+def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None, search_language: str | None = None, max_results: int = 15, max_seconds: int = 45) -> Clip:
+    deadline = time.monotonic() + max_seconds
     for link in search_links(phrase, audio_language, search_language, max_results):
+        if time.monotonic() >= deadline:
+            break
         url = urljoin(BASE, link)
         if not allowed(url):
             continue

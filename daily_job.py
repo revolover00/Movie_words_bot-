@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from telegram import Bot
 
@@ -46,6 +47,7 @@ def localized_caption(text: str, clip, level: str, learning: str, explanation: s
 def build_localized_message(level: str, learning: str, explanation: str):
     """Find an expression and verify its audio before producing a caption."""
     seen, topics = db.phrase_history(level, learning)
+    deadline = time.monotonic() + 120
     if learning in source_first.SEEDS:
         try:
             (text, topic), clip = source_first.find_expression_clip(learning, level, seen, topics)
@@ -65,6 +67,9 @@ def build_localized_message(level: str, learning: str, explanation: str):
     else:
         candidates = multilingual.expressions(learning, level, seen, topics)
     for text, topic in candidates:
+        if time.monotonic() >= deadline:
+            log.warning('Content search budget exhausted for %s/%s', level, learning)
+            break
         try:
             clip = clip_cafe.find_clip(
                 text, verify=lambda path, phrase: multilingual.verify_audio(path, phrase, learning),

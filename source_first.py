@@ -70,7 +70,7 @@ def find_expression_clip(language: str, level: str, seen: set[str], topics: list
             chosen = extract_expression(transcript, language, level, seen, topics)
             return chosen is not None
         try:
-            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language, search_language=search_language, max_results=5)
+            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language, search_language=search_language, max_results=5, max_seconds=30)
         except RuntimeError:
             continue
         if chosen is not None:
