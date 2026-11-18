@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlencode, urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import URLError
 
 BASE = 'https://clip.cafe/'
@@ -45,8 +45,20 @@ class PageParser(HTMLParser):
             self.meta[attrs['property']] = attrs['content']
 
 
+class SafeRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not allowed(newurl):
+            raise ValueError('Unexpected source redirect')
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_opener = build_opener(SafeRedirect())
+
+
 def get(url):
-    return urlopen(Request(url, headers=HEADERS), timeout=30)
+    if not allowed(url):
+        raise ValueError('Unexpected source URL')
+    return _opener.open(Request(url, headers=HEADERS), timeout=30)
 
 
 def page(url):
@@ -93,7 +105,11 @@ def matches(phrase: str, quote: str) -> bool:
 
 def allowed(url: str) -> bool:
     parsed = urlparse(url)
-    return parsed.scheme == 'https' and parsed.hostname == 'clip.cafe'
+    try:
+        return (parsed.scheme == 'https' and parsed.hostname == 'clip.cafe'
+                and parsed.port in (None, 443) and not parsed.username and not parsed.password)
+    except ValueError:
+        return False
 
 
 def search_links(phrase: str, audio_language: str | None, search_language: str | None = None, limit: int = 15):

@@ -86,3 +86,14 @@ def test_clip_search_stops_after_time_budget(monkeypatch, tmp_path):
     monkeypatch.setattr(clip_cafe, 'page', lambda *args: pytest.fail('Should stop before downloading'))
     with pytest.raises(RuntimeError):
         clip_cafe.find_clip('hello', tmp_path, max_seconds=45)
+
+
+def test_redirect_policy_rejects_untrusted_destinations():
+    from urllib.request import Request
+    from clip_cafe import SafeRedirect
+    import pytest
+    req = Request('https://clip.cafe/a')
+    for url in ('https://evil.example/', 'http://127.0.0.1/', 'https://clip.cafe:444/a', 'https://u@clip.cafe/a'):
+        assert not allowed(url)
+        with pytest.raises(ValueError):
+            SafeRedirect().redirect_request(req, None, 302, 'Found', {}, url)
