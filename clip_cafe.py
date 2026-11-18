@@ -130,25 +130,30 @@ def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_
             slug = urlparse(video_url).path.rsplit('/', 1)[-1].removesuffix('.mp4')
             if not re.fullmatch(r'[A-Za-z0-9_-]+', slug):
                 continue
-            with get(video_url) as video:
-                if not allowed(video.url):
-                    raise ValueError('Unexpected video redirect')
-                out_dir.mkdir(parents=True, exist_ok=True)
-                path = out_dir / f'clipcafe-{slug}.mp4'
-                size = 0
-                try:
-                    with path.open('wb') as output:
-                        for chunk in iter(lambda: video.read(65536), b''):
-                            size += len(chunk)
-                            if size > MAX_BYTES:
-                                raise ValueError('Clip exceeds size limit')
-                            output.write(chunk)
-                    with path.open('rb') as f:
-                        if size < 1024 or b'ftyp' not in f.read(64):
-                            raise ValueError('Invalid MP4')
-                except Exception:
-                    path.unlink(missing_ok=True)
-                    raise
+            out_dir.mkdir(parents=True, exist_ok=True)
+            path = out_dir / f'clipcafe-{slug}.mp4'
+            localized = False
+            if audio_language and verify is not None:
+                from hls_clips import download_localized
+                localized = download_localized(slug, audio_language, path)
+            if not localized:
+                with get(video_url) as video:
+                    if not allowed(video.url):
+                        raise ValueError('Unexpected video redirect')
+                    size = 0
+                    try:
+                        with path.open('wb') as output:
+                            for chunk in iter(lambda: video.read(65536), b''):
+                                size += len(chunk)
+                                if size > MAX_BYTES:
+                                    raise ValueError('Clip exceeds size limit')
+                                output.write(chunk)
+                        with path.open('rb') as f:
+                            if size < 1024 or b'ftyp' not in f.read(64):
+                                raise ValueError('Invalid MP4')
+                    except Exception:
+                        path.unlink(missing_ok=True)
+                        raise
             if verify is not None:
                 try:
                     verified = verify(path, phrase)
