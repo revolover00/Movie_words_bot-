@@ -82,3 +82,19 @@ test('opening interval input preserves a new preferences row due time', async ()
   const query = queries.find(q => q.sql.includes("'interval'") && q.sql.includes('INSERT INTO subscriber_preferences'));
   assert.match(query.sql, /subscribed_at \+ interval '3 hours'/);
 });
+
+test('webhook returns failure for Telegram errors so updates can retry', async () => {
+  const previous = globalThis.fetch;
+  const previousError = console.error;
+  let status;
+  globalThis.fetch = async () => { throw new Error('temporary'); };
+  console.error = () => {};
+  try {
+    await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, from: { id: 1 }, text: '/help' } } },
+      { status(code) { status = code; return this; }, send() {} });
+    assert.equal(status, 500);
+  } finally {
+    console.error = previousError;
+    globalThis.fetch = previous;
+  }
+});
