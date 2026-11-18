@@ -15,8 +15,7 @@ GitHub Actions (free ephemeral runner)
     ▼
 daily_job.py
     ├─ Groq API        → word meaning (Egyptian Arabic) + example
-    ├─ InnerTube       → search YouTube for "<word> movie scene" (no API key)
-    ├─ yt-dlp + FFmpeg → download subtitles, find the word, cut a short clip
+    ├─ Yarn            → find a movie quote containing the word and download its clip
     ├─ Neon Postgres   → subscribers list + already-sent words
     ▼
 Telegram Bot API       → send video + caption to all subscribers
@@ -32,7 +31,7 @@ New users subscribe via `/start` (handled by `bot.py` with long polling).
 | GitHub Actions | Free ephemeral worker |
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
-| yt-dlp + FFmpeg | YouTube download + clip cutting |
+| Yarn | Movie quote search and short clips |
 | Groq API (`qwen/qwen3.8-27b`) | Word meanings |
 
 ## Setup
@@ -136,7 +135,8 @@ The PAT needs `repo` scope (classic) or repository Contents read and write permi
 bot.py               # Telegram bot, /start etc. (polling, for local use)
 worker.js            # Cloudflare Worker webhook — free 24/7 /start hosting
 daily_job.py         # Daily broadcast pipeline
-youtube_free.py      # InnerTube search (+ yt-dlp fallback)
+yarn_clips.py        # Yarn movie quote search and clip download
+youtube_free.py      # Legacy InnerTube search
 clipper.py           # yt-dlp + FFmpeg clip cutting
 groq_meaning.py      # Groq meanings (with retries)
 words.py / words.txt # Word bank
@@ -156,9 +156,9 @@ python -m pytest -q
 
 ## Notes
 
-- **InnerTube** may need a `clientVersion` bump every few months when YouTube changes its API (see `youtube_free.py`).
+- Yarn integration parses public web pages, which may change or become unavailable.
 - Words are English by default; meanings come in Egyptian Arabic. To switch languages, edit `words.txt` and the prompt in `groq_meaning.py`.
-- Clips are short excerpts from YouTube for educational use.
+- Clips are short excerpts from Yarn for educational use.
 
 ## License
 
