@@ -111,3 +111,28 @@ def last_sent_word() -> Optional[str]:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     init_db()
+
+
+def active_subscribers_by_level() -> dict[str, list[int]]:
+    """Return active subscriber chat IDs grouped by their selected CEFR level."""
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT level, chat_id FROM subscribers WHERE is_active = TRUE ORDER BY chat_id")
+        groups: dict[str, list[int]] = {}
+        for level, chat_id in cur.fetchall():
+            groups.setdefault(level, []).append(chat_id)
+        return groups
+
+
+def phrase_history(level: str) -> tuple[set[str], list[str]]:
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT phrase, topic FROM sent_phrases WHERE level = %s ORDER BY sent_at DESC", (level,))
+        rows = cur.fetchall()
+        return {row[0].casefold() for row in rows}, [row[1] for row in rows[:3]]
+
+
+def mark_phrase_sent(level: str, phrase: str, topic: str, clip_id: str, title: str) -> None:
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO sent_phrases (level, phrase, topic, clip_id, video_title) VALUES (%s, %s, %s, %s, %s)",
+            (level, phrase, topic, clip_id, title),
+        )
