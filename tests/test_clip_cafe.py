@@ -97,3 +97,8 @@ def test_redirect_policy_rejects_untrusted_destinations():
         assert not allowed(url)
         with pytest.raises(ValueError):
             SafeRedirect().redirect_request(req, None, 302, 'Found', {}, url)
+
+
+def test_allowed_rejects_malformed_urls():
+    assert not allowed('https://[bad-host/a')
+    assert not allowed('https://clip.cafe:bad/a')

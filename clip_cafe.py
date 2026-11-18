@@ -104,8 +104,8 @@ def matches(phrase: str, quote: str) -> bool:
 
 
 def allowed(url: str) -> bool:
-    parsed = urlparse(url)
     try:
+        parsed = urlparse(url)
         return (parsed.scheme == 'https' and parsed.hostname == 'clip.cafe'
                 and parsed.port in (None, 443) and not parsed.username and not parsed.password)
     except ValueError:
