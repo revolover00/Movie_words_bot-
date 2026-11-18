@@ -24,3 +24,19 @@ def test_audio_verification_rejects_wrong_language_or_phrase(monkeypatch, tmp_pa
     assert multilingual.verify_audio(clip, 'Nice to meet you', 'en')
     assert not multilingual.verify_audio(clip, 'Nice to meet you', 'es')
     assert not multilingual.verify_audio(clip, 'Good morning', 'en')
+
+
+def test_stream_hint_avoids_transcribing_wrong_language(monkeypatch, tmp_path):
+    clip = tmp_path / 'sample.mp4'
+    clip.write_bytes(b'fake')
+    fake = MagicMock()
+    monkeypatch.setattr(multilingual, 'client', lambda: fake)
+    monkeypatch.setattr(multilingual.subprocess, 'run', lambda *a, **kw: SimpleNamespace(stdout='{"streams":[{"tags":{"language":"eng"}}]}'))
+    assert not multilingual.verify_audio(clip, 'こんにちは', 'ja')
+    fake.audio.transcriptions.create.assert_not_called()
+    assert multilingual.likely_audio_language(clip, 'en')
+
+
+def test_unknown_stream_language_falls_back_to_transcription(monkeypatch, tmp_path):
+    monkeypatch.setattr(multilingual.subprocess, 'run', lambda *a, **kw: SimpleNamespace(stdout='{"streams":[{"tags":{"language":"und"}}]}'))
+    assert multilingual.likely_audio_language(tmp_path / 'clip.mp4', 'ja')

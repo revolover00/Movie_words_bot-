@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import subprocess
 from pathlib import Path
 
 from openai import OpenAI
@@ -76,6 +77,30 @@ def meaning(phrase: str, learning: str, explanation: str, level: str) -> str:
     return result
 
 
+
+# MP4 stream tags are only a fast rejection hint: unknown tags still go to
+# Whisper, and every accepted clip must pass transcription verification.
+STREAM_LANGUAGES = {
+    'en': {'eng'}, 'zh': {'zho', 'chi'}, 'hi': {'hin'}, 'es': {'spa'},
+    'fr': {'fra', 'fre'}, 'ar': {'ara'}, 'pt': {'por'}, 'ru': {'rus'},
+    'de': {'deu', 'ger'}, 'ja': {'jpn'},
+}
+
+
+def likely_audio_language(path: Path, language: str) -> bool:
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries',
+             'stream_tags=language', '-of', 'json', str(path)],
+            capture_output=True, text=True, timeout=10, check=True,
+        )
+        streams = json.loads(result.stdout).get('streams', [])
+        tag = (streams[0].get('tags', {}).get('language', '') if streams else '').lower()
+        return not tag or tag == 'und' or tag in STREAM_LANGUAGES[language]
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError, AttributeError):
+        return True
+
+
 def verify_audio(path: Path, expression: str, language: str) -> bool:
     """Fail closed unless speech-to-text identifies the language and phrase.
 
@@ -83,6 +108,8 @@ def verify_audio(path: Path, expression: str, language: str) -> bool:
     guarantee. A failure to access the API is not treated as a verified clip.
     """
     validate_language(language)
+    if not likely_audio_language(path, language):
+        return False
     with path.open('rb') as video:
         transcript = client().audio.transcriptions.create(
             model='whisper-large-v3-turbo', file=video,
