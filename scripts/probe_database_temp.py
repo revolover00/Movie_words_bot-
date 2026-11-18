@@ -28,6 +28,10 @@ try:
         with conn.cursor() as cur:
             cur.execute("UPDATE subscriber_preferences SET next_due_at = now() - interval '1 minute' WHERE chat_id = 222")
         conn.commit()
+        assert db.advance_due_after_delivery(222, users[222]['settings_updated_at'])
+        with conn.cursor() as cur:
+            cur.execute("UPDATE subscriber_preferences SET next_due_at = now() - interval '1 minute' WHERE chat_id = 222")
+        conn.commit()
         users = {u['chat_id']: u for u in db.due_subscribers()}
         with conn.cursor() as cur:
             cur.execute("UPDATE subscribers SET level = 'C1' WHERE chat_id = 222")
