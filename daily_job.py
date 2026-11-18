@@ -58,6 +58,7 @@ async def run_groups(groups: dict[str, list[int]]) -> None:
             expression, clip, caption = build_message(level)
             sent, failed = await broadcast(bot, chat_ids, str(clip.path), caption)
             log.info('Level %s: %d sent, %d failed', level, sent, failed)
+            print(f'::notice title=Level {level} delivery::{sent} sent, {failed} failed', flush=True)
             if sent:
                 db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title)
             else:
@@ -75,6 +76,7 @@ def main() -> None:
     groups = db.active_subscribers_by_level()
     if not groups:
         log.info('No active subscribers; no messages sent')
+        print('::notice title=Delivery::No active subscribers; no messages sent', flush=True)
         return
     asyncio.run(run_groups(groups))
 
