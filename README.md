@@ -1,8 +1,8 @@
 # Movie Word Bot 🎬
 
-A free, open-source Telegram bot that sends subscribers **one English word per day** with a **short movie clip** where the word is spoken, plus its meaning in Egyptian Arabic.
+A free, open-source Telegram bot that sends useful English expressions with a matching short movie clip and an Egyptian Arabic explanation. Subscribers choose a CEFR level from A2 through C2.
 
-> Learn English by watching movies — one word a day, zero cost, zero self-hosting.
+> Learn English by watching movies — expressions for your level, zero self-hosting.
 
 ## How it works
 
@@ -14,14 +14,15 @@ GitHub Actions (free ephemeral runner)
     │
     ▼
 daily_job.py
-    ├─ Groq API        → word meaning (Egyptian Arabic) + example
-    ├─ Yarn            → find a movie quote containing the word and download its clip
-    ├─ Neon Postgres   → subscribers list + already-sent words
+    ├─ Curated phrases → expression for each active CEFR level
+    ├─ Groq API        → Egyptian Arabic explanation + example
+    ├─ Yarn            → find a movie quote containing the expression and download its clip
+    ├─ Neon Postgres   → subscriber levels + sent expressions
     ▼
-Telegram Bot API       → send video + caption to all subscribers
+Telegram Bot API       → send each level’s clip to its subscribers
 ```
 
-New users subscribe via `/start` (handled by `bot.py` with long polling).
+New users subscribe with `/start` and pick a level. `/level` changes it at any time, `/today` shows the latest expression for that level, and `/stop` unsubscribes. Existing subscribers default to A2 and keep their subscription. CEFR labels are approximate, and the curated bank rotates topics and avoids repeats until exhausted.
 
 ## Stack
 
@@ -32,7 +33,7 @@ New users subscribe via `/start` (handled by `bot.py` with long polling).
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
 | Yarn | Movie quote search and short clips |
-| Groq API (`qwen/qwen3.8-27b`) | Word meanings |
+| Groq API (`qwen/qwen3.8-27b`) | Explanations and examples |
 
 ## Setup
 
@@ -75,9 +76,9 @@ https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-app>.vercel.app
 ```
 
 Telegram replies `{"ok":true,...}` — done. The function in `api/telegram.js`
-handles `/start`, `/stop`, `/help`, `/today` and talks to Neon over TLS.
+handles `/start`, `/level`, `/stop`, `/help`, `/today` and talks to Neon over TLS. The webhook and the scheduled job apply the additive level/history migration automatically.
 
-### 5b. Alternative: Cloudflare Worker (needs a desktop/CLI)
+### 5b. Legacy Cloudflare Worker (does not support levels)
 
 ```bash
 npm i -g wrangler
@@ -87,7 +88,7 @@ wrangler secret put DATABASE_URL
 wrangler deploy
 ```
 
-Then point Telegram at `https://<worker-url>` the same way.
+This legacy worker does not implement level selection; use the Vercel webhook above for this version.
 
 For local testing you can still run `python bot.py` (polling) instead.
 
@@ -95,8 +96,7 @@ For local testing you can still run `python bot.py` (polling) instead.
 
 ```bash
 pip install -r requirements.txt
-sudo apt-get install ffmpeg   # or: brew install ffmpeg
-python daily_job.py  # sends today's word immediately
+python daily_job.py  # sends one expression to each active level group
 ```
 
 ### 7. Automate with GitHub Actions
@@ -135,6 +135,7 @@ The PAT needs `repo` scope (classic) or repository Contents read and write permi
 bot.py               # Telegram bot, /start etc. (polling, for local use)
 worker.js            # Cloudflare Worker webhook — free 24/7 /start hosting
 daily_job.py         # Daily broadcast pipeline
+phrases.py           # CEFR-labelled expressions and topics
 yarn_clips.py        # Yarn movie quote search and clip download
 youtube_free.py      # Legacy InnerTube search
 clipper.py           # yt-dlp + FFmpeg clip cutting
