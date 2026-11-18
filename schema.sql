@@ -44,3 +44,5 @@ CREATE TABLE IF NOT EXISTS subscriber_preferences (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE subscriber_preferences ADD COLUMN IF NOT EXISTS input_state TEXT;
+
+ALTER TABLE sent_phrases ADD COLUMN IF NOT EXISTS learning_language TEXT NOT NULL DEFAULT 'en';

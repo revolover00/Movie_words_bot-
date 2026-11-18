@@ -89,7 +89,7 @@ def allowed(url: str) -> bool:
     return parsed.scheme == 'https' and parsed.hostname == 'clip.cafe'
 
 
-def find_clip(phrase: str, out_dir: Path = Path('clips')) -> Clip:
+def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None) -> Clip:
     query = urlencode({'s': f'"{phrase}"', 'usersearch': '1', 'ss': 's'})
     result = page(BASE + '?' + query)
     for link in list(dict.fromkeys(result.links))[:15]:
@@ -127,6 +127,10 @@ def find_clip(phrase: str, out_dir: Path = Path('clips')) -> Clip:
                 except Exception:
                     path.unlink(missing_ok=True)
                     raise
+            if verify is not None and not verify(path, phrase):
+                path.unlink(missing_ok=True)
+                log.info('Audio did not match the requested expression in clip %s', slug)
+                continue
             log.info('Selected Clip.Cafe clip %s: %s', slug, movie)
             return Clip(slug, movie, quote, url, path)
         except (URLError, ValueError, OSError) as exc:

@@ -24,6 +24,7 @@ async function withDb(fn) {
       id BIGSERIAL PRIMARY KEY, level TEXT NOT NULL, phrase TEXT NOT NULL, topic TEXT NOT NULL,
       clip_id TEXT, video_title TEXT, sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
+    await client.query("ALTER TABLE sent_phrases ADD COLUMN IF NOT EXISTS learning_language TEXT NOT NULL DEFAULT 'en'");
     await client.query(`CREATE TABLE IF NOT EXISTS subscriber_preferences (
       chat_id BIGINT PRIMARY KEY REFERENCES subscribers(chat_id) ON DELETE CASCADE,
       learning_language TEXT NOT NULL DEFAULT 'en' CHECK (learning_language IN ('en','zh','hi','es','fr','ar','pt','ru','de','ja')),
@@ -105,8 +106,12 @@ export default async function handler(req, res) {
       await sendMessage(chatId, 'تم إلغاء الاشتراك. تقدر ترجع بـ /start 👋');
     } else if (command === '/today') {
       const result = await withDb(client => client.query(`SELECT s.level, p.phrase, p.video_title
-        FROM subscribers s LEFT JOIN LATERAL (
-          SELECT phrase, video_title FROM sent_phrases WHERE level = s.level ORDER BY sent_at DESC LIMIT 1
+        FROM subscribers s
+        LEFT JOIN subscriber_preferences settings ON settings.chat_id = s.chat_id
+        LEFT JOIN LATERAL (
+          SELECT phrase, video_title FROM sent_phrases
+          WHERE level = s.level AND learning_language = COALESCE(settings.learning_language, 'en')
+          ORDER BY sent_at DESC LIMIT 1
         ) p ON TRUE WHERE s.chat_id = $1 AND s.is_active = TRUE`, [chatId]));
       const row = result.rows[0];
       await sendMessage(chatId, !row ? 'اشترك الأول باستخدام /start' : row.phrase

@@ -9,6 +9,7 @@ from telegram import Bot
 import db
 import phrases
 import clip_cafe
+import multilingual
 from config import config
 from groq_meaning import get_meaning
 
@@ -31,6 +32,28 @@ def build_message(level: str):
             raise ValueError('Telegram video caption exceeds 1024 characters')
         return expression, clip, caption
     raise RuntimeError(f'No matching movie clip for level {level}')
+
+
+def build_localized_message(level: str, learning: str, explanation: str):
+    """Find an expression and verify its audio before producing a caption."""
+    seen, topics = db.phrase_history(level, learning)
+    if learning == 'en':
+        candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]
+    else:
+        candidates = multilingual.expressions(learning, level, seen, topics)
+    for text, topic in candidates:
+        try:
+            clip = clip_cafe.find_clip(
+                text, verify=lambda path, phrase: multilingual.verify_audio(path, phrase, learning))
+        except RuntimeError:
+            log.info('No verified audio found for expression %r', text)
+            continue
+        meaning = multilingual.meaning(text, learning, explanation, level)
+        caption = f'🎬 {level} · {learning.upper()}\n\n{text}\n\n{meaning}\n\n🎞️ {clip.title}\n🔗 {clip.url}'
+        if len(caption) > 1024:
+            raise ValueError('Telegram video caption exceeds 1024 characters')
+        return phrases.Phrase(text, topic), clip, caption
+    raise RuntimeError(f'No verified clip for {level}/{learning}')
 
 
 async def broadcast(bot: Bot, chat_ids: list[int], clip_path: str, caption: str) -> tuple[int, int]:
@@ -74,8 +97,7 @@ async def run_groups(groups: dict[str, list[int]]) -> None:
 async def run_due_subscribers(subscribers: list[dict]) -> None:
     """Deliver only to due subscribers; advance each schedule after successful sends.
 
-    Multilingual generation is not yet enabled; fail closed for unsupported
-    settings rather than send an expression in the wrong language.
+    Clips must pass audio verification before delivery.
     """
     bot = Bot(token=config.bot_token)
     groups: dict[tuple[str, str, str], list[dict]] = {}
@@ -84,12 +106,8 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
         groups.setdefault(key, []).append(sub)
     failures = []
     for (level, learning, explanation), group in groups.items():
-        if (learning, explanation) != ('en', 'ar'):
-            log.error('Multilingual content is not yet supported: %s / %s', learning, explanation)
-            failures.append(f'{level}/{learning}/{explanation}')
-            continue
         try:
-            expression, clip, caption = build_message(level)
+            expression, clip, caption = build_localized_message(level, learning, explanation)
             sent_count = 0
             for sub in group:
                 sent, failed = await broadcast(bot, [sub['chat_id']], str(clip.path), caption)
@@ -100,7 +118,7 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
                 elif failed:
                     failures.append(f"chat {sub['chat_id']}")
             if sent_count:
-                db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title)
+                db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title, learning)
             print(f'::notice title=Level {level} delivery::{sent_count} sent', flush=True)
         except Exception:
             log.exception('Failed to process level %s', level)

@@ -56,7 +56,7 @@ def test_only_due_users_are_sent_and_advanced(monkeypatch):
     users = [dict(chat_id=12, level='A2', learning_language='en', explanation_language='ar', settings_updated_at='v1'),
              dict(chat_id=13, level='A2', learning_language='en', explanation_language='ar', settings_updated_at=None)]
     monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
-    monkeypatch.setattr(daily_job, 'build_message', lambda level: (
+    monkeypatch.setattr(daily_job, 'build_localized_message', lambda level, learning, explanation: (
         phrases.BANK[level][0], SimpleNamespace(path='/clip', clip_id='id', title='Movie'), 'caption'))
     async def send(bot, ids, path, caption):
         sent.extend(ids)
@@ -72,10 +72,11 @@ def test_only_due_users_are_sent_and_advanced(monkeypatch):
     assert len(marked) == 1
 
 
-def test_unsupported_language_fails_without_sending(monkeypatch):
+def test_unverified_clip_fails_without_sending(monkeypatch):
     import pytest
     monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
     send = AsyncMock()
+    monkeypatch.setattr(daily_job, 'build_localized_message', lambda *args: (_ for _ in ()).throw(RuntimeError('No verified clip')))
     monkeypatch.setattr(daily_job, 'broadcast', send)
     with pytest.raises(RuntimeError):
         asyncio.run(daily_job.run_due_subscribers([dict(chat_id=1, level='A2', learning_language='ja', explanation_language='ar', settings_updated_at=None)]))
