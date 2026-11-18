@@ -96,12 +96,12 @@ def allowed(url: str) -> bool:
 
 
 def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None) -> Clip:
-    query = urlencode({'s': f'"{phrase}"', 'usersearch': '1', 'ss': 's'})
+    params = {'s': f'"{phrase}"', 'usersearch': '1', 'ss': 's'}
+    if audio_language:
+        params.update(audio=audio_language, sl=audio_language)
+    query = urlencode(params)
     result = page(BASE + '?' + query)
     for link in list(dict.fromkeys(result.links))[:15]:
-        available = result.audio_languages.get(link)
-        if audio_language and available and audio_language.casefold() not in available:
-            continue
         url = urljoin(BASE, link)
         if not allowed(url):
             continue
