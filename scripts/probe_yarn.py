@@ -25,3 +25,19 @@ try:
 except Exception as exc:
     print(f'::error title=Yarn probe failed::{type(exc).__name__}: {str(exc)[:300]}')
     raise
+
+# Exercise the same exact-phrase matching and MP4 downloader used by the job.
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from yarn_clips import find_clip
+
+with TemporaryDirectory() as folder:
+    for expression in ('Nice to meet you', 'That makes sense', 'I owe you one'):
+        try:
+            clip = find_clip(expression, Path(folder))
+            print(f'::notice title=Phrase probe::{expression}: matched and downloaded {clip.title}')
+        except Exception as exc:
+            print(f'::error title=Phrase probe failed::{expression}: {type(exc).__name__}: {exc}')
+            raise
