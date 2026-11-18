@@ -40,5 +40,7 @@ CREATE TABLE IF NOT EXISTS subscriber_preferences (
       CHECK (explanation_language IN ('en', 'zh', 'hi', 'es', 'fr', 'ar', 'pt', 'ru', 'de', 'ja')),
     interval_minutes INTEGER NOT NULL DEFAULT 180 CHECK (interval_minutes BETWEEN 5 AND 1440),
     next_due_at TIMESTAMPTZ,
+    input_state TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE subscriber_preferences ADD COLUMN IF NOT EXISTS input_state TEXT;
