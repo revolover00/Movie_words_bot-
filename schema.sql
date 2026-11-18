@@ -29,3 +29,16 @@ CREATE TABLE IF NOT EXISTS sent_phrases (
     sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS sent_phrases_level_sent_at_idx ON sent_phrases (level, sent_at DESC);
+
+-- Additive preferences for the upcoming multilingual scheduler. Existing
+-- subscribers remain untouched; settings are created only on first use.
+CREATE TABLE IF NOT EXISTS subscriber_preferences (
+    chat_id BIGINT PRIMARY KEY REFERENCES subscribers(chat_id) ON DELETE CASCADE,
+    learning_language TEXT NOT NULL DEFAULT 'en'
+      CHECK (learning_language IN ('en', 'zh', 'hi', 'es', 'fr', 'ar', 'pt', 'ru', 'de', 'ja')),
+    explanation_language TEXT NOT NULL DEFAULT 'ar'
+      CHECK (explanation_language IN ('en', 'zh', 'hi', 'es', 'fr', 'ar', 'pt', 'ru', 'de', 'ja')),
+    interval_minutes INTEGER NOT NULL DEFAULT 180 CHECK (interval_minutes BETWEEN 5 AND 1440),
+    next_due_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

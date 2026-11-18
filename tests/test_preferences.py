@@ -1,0 +1,20 @@
+import pytest
+from preferences import LANGUAGE_CODES, validate_language, validate_interval
+
+
+def test_supported_languages():
+    assert len(LANGUAGE_CODES) == 10
+    assert validate_language('en') == 'en'
+    with pytest.raises(ValueError):
+        validate_language('invalid')
+
+
+@pytest.mark.parametrize('value,expected', [('5', 5), (' 6 ', 6), (180, 180), ('1440', 1440)])
+def test_valid_intervals(value, expected):
+    assert validate_interval(value) == expected
+
+
+@pytest.mark.parametrize('value', ['4', '1441', '-5', '1.5', '', '5 minutes', True, 5.5, None])
+def test_invalid_intervals(value):
+    with pytest.raises(ValueError):
+        validate_interval(value)
