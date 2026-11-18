@@ -11,6 +11,10 @@ from preferences import validate_language
 # Seeds are search hints, not the expression sent to the learner. The actual
 # expression is extracted and checked against the detected audio transcript.
 SEEDS = {
+    'es': ('gracias', 'hola', 'no lo sé', 'qué pasó'),
+    'fr': ('merci', 'bonjour', 'je ne sais pas', 'ça va'),
+    'pt': ('obrigado', 'olá', 'não sei', 'tudo bem'),
+    'de': ('danke', 'hallo', 'ich weiß nicht', 'was ist los'),
     'ja': ('こんにちは', 'ありがとう', '大丈夫', 'わかりました'),
     'zh': ('谢谢', '你好', '没关系', '对不起'),
     'ar': ('مرحبا', 'شكرا', 'كيف حالك', 'لا أعرف'),
