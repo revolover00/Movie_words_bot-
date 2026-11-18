@@ -20,3 +20,5 @@ with TemporaryDirectory() as out:
     except Exception as exc:
         result = f'unavailable: {type(exc).__name__}'
     print(f'::notice title=Audio sample {lang}::{result}', flush=True)
+    if result.startswith('unavailable:'):
+        raise SystemExit(1)

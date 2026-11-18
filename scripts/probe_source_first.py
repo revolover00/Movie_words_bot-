@@ -21,4 +21,5 @@ with TemporaryDirectory() as tmp, \
         assert clip.path.is_file() and meaning
         print(f'::notice title=Source-first {language}::Verified A2 expression and explanation from {clip.clip_id}', flush=True)
     except Exception as exc:
-        print(f'::warning title=Source-first {language} unavailable::{type(exc).__name__}', flush=True)
+        print(f'::error title=Source-first {language} unavailable::{type(exc).__name__}', flush=True)
+        raise SystemExit(1)
