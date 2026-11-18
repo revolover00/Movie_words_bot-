@@ -3,6 +3,14 @@ import pg from 'pg';
 
 const { Client } = pg;
 const LEVELS = ['A2', 'B1', 'B2', 'C1', 'C2'];
+const LANGUAGES = [
+  ['en', 'English'], ['zh', '中文'], ['hi', 'हिन्दी'], ['es', 'Español'],
+  ['fr', 'Français'], ['ar', 'العربية'], ['pt', 'Português'], ['ru', 'Русский'],
+  ['de', 'Deutsch'], ['ja', '日本語'],
+];
+const CODES = new Set(LANGUAGES.map(([code]) => code));
+const languageKeyboard = (kind) => ({ inline_keyboard: Array.from({ length: 5 }, (_, row) =>
+  LANGUAGES.slice(row * 2, row * 2 + 2).map(([code, label]) => ({ text: label, callback_data: `${kind}:${code}` }))) });
 const WELCOME = 'أهلاً بيك 🎬\nهيوصلك تعبير إنجليزي مع معناه بالمصري ومقطع من فيلم حسب مستواك.\n\nاختار مستواك من الأزرار، وتقدر تغيّره في أي وقت بـ /level.\n/today — آخر تعبير لمستواك\n/stop — إلغاء الاشتراك';
 const KEYBOARD = { inline_keyboard: [LEVELS.map(level => ({ text: level, callback_data: `level:${level}` }))] };
 
@@ -16,6 +24,13 @@ async function withDb(fn) {
       id BIGSERIAL PRIMARY KEY, level TEXT NOT NULL, phrase TEXT NOT NULL, topic TEXT NOT NULL,
       clip_id TEXT, video_title TEXT, sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS subscriber_preferences (
+      chat_id BIGINT PRIMARY KEY REFERENCES subscribers(chat_id) ON DELETE CASCADE,
+      learning_language TEXT NOT NULL DEFAULT 'en', explanation_language TEXT NOT NULL DEFAULT 'ar',
+      interval_minutes INTEGER NOT NULL DEFAULT 180 CHECK (interval_minutes BETWEEN 5 AND 1440),
+      next_due_at TIMESTAMPTZ, input_state TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+    await client.query('ALTER TABLE subscriber_preferences ADD COLUMN IF NOT EXISTS input_state TEXT');
     return await fn(client);
   } finally {
     await client.end();
@@ -31,7 +46,7 @@ async function telegram(method, payload) {
 }
 
 async function sendMessage(chatId, text, keyboard) {
-  await telegram('sendMessage', { chat_id: chatId, text, ...(keyboard ? { reply_markup: KEYBOARD } : {}) });
+  await telegram('sendMessage', { chat_id: chatId, text, ...(keyboard ? { reply_markup: keyboard === true ? KEYBOARD : keyboard } : {}) });
 }
 
 export default async function handler(req, res) {
@@ -41,17 +56,25 @@ export default async function handler(req, res) {
     const callback = update.callback_query;
     if (callback) {
       const chat = callback.message?.chat;
-      const level = (callback.data || '').startsWith('level:') ? callback.data.slice(6) : '';
-      if (!chat || chat.type !== 'private' || callback.from?.id !== chat.id || !LEVELS.includes(level)) {
+      const [kind, value] = (callback.data || '').split(':');
+      const valid = (kind === 'level' && LEVELS.includes(value)) ||
+        (['learn', 'explain'].includes(kind) && CODES.has(value));
+      if (!chat || chat.type !== 'private' || callback.from?.id !== chat.id || !valid) {
         await telegram('answerCallbackQuery', { callback_query_id: callback.id, text: 'اختيار غير صالح' });
         return res.status(200).send('ok');
       }
-      const result = await withDb(client => client.query(
-        'UPDATE subscribers SET level = $1 WHERE chat_id = $2 AND is_active = TRUE RETURNING level',
-        [level, chat.id],
-      ));
+      const result = await withDb(async client => {
+        if (kind === 'level') return client.query(
+          'UPDATE subscribers SET level = $1 WHERE chat_id = $2 AND is_active = TRUE RETURNING level', [value, chat.id]);
+        // Insert only for active subscribers, preserving all other preferences.
+        const column = kind === 'learn' ? 'learning_language' : 'explanation_language';
+        return client.query(`INSERT INTO subscriber_preferences (chat_id, ${column}, next_due_at)
+          SELECT chat_id, $1, now() + interval '3 hours' FROM subscribers WHERE chat_id = $2 AND is_active = TRUE
+          ON CONFLICT (chat_id) DO UPDATE SET ${column} = EXCLUDED.${column}, updated_at = now()
+          RETURNING ${column}`, [value, chat.id]);
+      });
       await telegram('answerCallbackQuery', { callback_query_id: callback.id });
-      await sendMessage(chat.id, result.rowCount ? `تمام ✅ مستواك دلوقتي ${level}.` : 'اشترك الأول باستخدام /start');
+      await sendMessage(chat.id, result.rowCount ? `تمام ✅ ${kind === 'level' ? 'مستواك' : kind === 'learn' ? 'لغة التعلّم' : 'لغة الشرح'}: ${value}.` : 'اشترك الأول باستخدام /start');
       return res.status(200).send('ok');
     }
     const message = update.message || {};
@@ -65,6 +88,14 @@ export default async function handler(req, res) {
         SET username = EXCLUDED.username, first_name = EXCLUDED.first_name, is_active = TRUE`,
       [chatId, message.from?.username || null, message.from?.first_name || null]));
       await sendMessage(chatId, WELCOME, true);
+    } else if (command === '/learn' || command === '/explain') {
+      const kind = command === '/learn' ? 'learn' : 'explain';
+      await sendMessage(chatId, kind === 'learn' ? 'اختار اللغة اللي عايز تتعلمها:' : 'اختار لغة الشرح:', languageKeyboard(kind));
+    } else if (command === '/interval') {
+      const result = await withDb(client => client.query(`INSERT INTO subscriber_preferences (chat_id, input_state, next_due_at)
+        SELECT chat_id, 'interval', now() + interval '3 hours' FROM subscribers WHERE chat_id = $1 AND is_active = TRUE
+        ON CONFLICT (chat_id) DO UPDATE SET input_state = 'interval' RETURNING chat_id`, [chatId]));
+      await sendMessage(chatId, result.rowCount ? 'ابعت عدد الدقايق بين الرسائل، من ٥ لحد ١٤٤٠.' : 'اشترك الأول باستخدام /start');
     } else if (command === '/level') {
       const result = await withDb(client => client.query('SELECT level FROM subscribers WHERE chat_id = $1 AND is_active = TRUE', [chatId]));
       await sendMessage(chatId, result.rows.length ? `مستواك الحالي ${result.rows[0].level}. اختار مستوى جديد:` : 'اشترك الأول باستخدام /start', result.rows.length > 0);
@@ -81,7 +112,20 @@ export default async function handler(req, res) {
         ? `🎬 آخر تعبير لمستوى ${row.level}: ${row.phrase}\n🎞️ من: ${row.video_title || '—'}`
         : `لسه مفيش تعبير اتبعت لمستوى ${row.level} ⏳`);
     } else if (command === '/help') {
-      await sendMessage(chatId, WELCOME, true);
+      await sendMessage(chatId, WELCOME + '\n/learn — لغة التعلّم\n/explain — لغة الشرح\n/interval — المدة بين الرسائل', true);
+    } else if (message.text && !command.startsWith('/')) {
+      const input = message.text.trim().replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x6f0));
+      const result = await withDb(async client => {
+        const state = await client.query("SELECT input_state FROM subscriber_preferences WHERE chat_id = $1", [chatId]);
+        if (state.rows[0]?.input_state !== 'interval') return 'none';
+        if (!/^[0-9]{1,4}$/.test(input) || Number(input) < 5 || Number(input) > 1440) return 'invalid';
+        await client.query(`UPDATE subscriber_preferences SET interval_minutes = $1,
+          next_due_at = now() + ($1 * interval '1 minute'), input_state = NULL, updated_at = now()
+          WHERE chat_id = $2 AND input_state = 'interval'`, [Number(input), chatId]);
+        return 'saved';
+      });
+      if (result === 'saved') await sendMessage(chatId, `تمام ✅ المدة بين الرسائل ${Number(input)} دقيقة.`);
+      else if (result === 'invalid') await sendMessage(chatId, 'ابعت رقم صحيح من ٥ لحد ١٤٤٠ دقيقة.');
     }
   } catch (err) {
     console.error('webhook error', err);
