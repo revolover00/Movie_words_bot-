@@ -56,8 +56,9 @@ def test_only_due_users_are_sent_and_advanced(monkeypatch):
     users = [dict(chat_id=12, level='A2', learning_language='en', explanation_language='ar', settings_updated_at='v1'),
              dict(chat_id=13, level='A2', learning_language='en', explanation_language='ar', settings_updated_at=None)]
     monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
-    monkeypatch.setattr(daily_job, 'build_localized_message', lambda level, learning, explanation: (
-        phrases.BANK[level][0], SimpleNamespace(path='/clip', clip_id='id', title='Movie'), 'caption'))
+    monkeypatch.setattr(daily_job, 'select_localized_clip', lambda level, learning: (
+        phrases.BANK[level][0], SimpleNamespace(path='/clip', clip_id='id', title='Movie')))
+    monkeypatch.setattr(daily_job, 'localized_caption', lambda *args: 'caption')
     async def send(bot, ids, path, caption):
         sent.extend(ids)
         return (1, 0) if ids == [12] else (0, 1)
@@ -77,7 +78,7 @@ def test_unverified_clip_fails_without_sending(monkeypatch):
     import pytest
     monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
     send = AsyncMock()
-    monkeypatch.setattr(daily_job, 'build_localized_message', lambda *args: (_ for _ in ()).throw(RuntimeError('No verified clip')))
+    monkeypatch.setattr(daily_job, 'select_localized_clip', lambda *args: (_ for _ in ()).throw(RuntimeError('No verified clip')))
     monkeypatch.setattr(daily_job, 'broadcast', send)
     with pytest.raises(RuntimeError):
         asyncio.run(daily_job.run_due_subscribers([dict(chat_id=1, level='A2', learning_language='ja', explanation_language='ar', settings_updated_at=None)]))
@@ -86,8 +87,9 @@ def test_unverified_clip_fails_without_sending(monkeypatch):
 
 def test_changed_settings_or_unsubscribe_prevents_delivery(monkeypatch):
     monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
-    monkeypatch.setattr(daily_job, 'build_localized_message', lambda *args: (
-        phrases.BANK['A2'][0], SimpleNamespace(path='/clip', clip_id='id', title='Movie'), 'caption'))
+    monkeypatch.setattr(daily_job, 'select_localized_clip', lambda *args: (
+        phrases.BANK['A2'][0], SimpleNamespace(path='/clip', clip_id='id', title='Movie')))
+    monkeypatch.setattr(daily_job, 'localized_caption', lambda *args: 'caption')
     monkeypatch.setattr(daily_job.db, 'still_due_with_settings', lambda sub: False)
     send = AsyncMock()
     monkeypatch.setattr(daily_job, 'broadcast', send)
@@ -145,3 +147,20 @@ def test_source_first_build_uses_verified_selected_expression(monkeypatch):
     expression, found, caption = daily_job.build_localized_message('A2', 'ja', 'ar')
     assert expression.text == 'これは何ですか' and found is clip
     assert expression.text in caption and 'meaning' in caption
+
+
+def test_same_learning_group_reuses_clip_across_explanation_languages(monkeypatch):
+    users = [dict(chat_id=i, level='A2', learning_language='ja', explanation_language=exp, settings_updated_at=None)
+             for i, exp in [(1, 'ar'), (2, 'en')]]
+    clip = SimpleNamespace(path='/clip', clip_id='id', title='Movie')
+    selected, captions, marked = [], [], []
+    monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
+    monkeypatch.setattr(daily_job, 'select_localized_clip', lambda *args: (selected.append(args) or (phrases.BANK['A2'][0], clip)))
+    monkeypatch.setattr(daily_job, 'localized_caption', lambda text, clip, level, learning, explanation: captions.append(explanation) or explanation)
+    monkeypatch.setattr(daily_job.db, 'still_due_with_settings', lambda sub: True)
+    monkeypatch.setattr(daily_job.db, 'advance_due_after_delivery', lambda *args: True)
+    monkeypatch.setattr(daily_job.db, 'mark_phrase_sent', lambda *args: marked.append(args))
+    monkeypatch.setattr(daily_job, 'broadcast', AsyncMock(return_value=(1, 0)))
+    asyncio.run(daily_job.run_due_subscribers(users))
+    assert selected == [('A2', 'ja')]
+    assert captions == ['ar', 'en'] and len(marked) == 1

@@ -44,8 +44,8 @@ def localized_caption(text: str, clip, level: str, learning: str, explanation: s
     return caption
 
 
-def build_localized_message(level: str, learning: str, explanation: str):
-    """Find an expression and verify its audio before producing a caption."""
+def select_localized_clip(level: str, learning: str):
+    """Find an expression and verify its audio before returning its clip."""
     seen, topics = db.phrase_history(level, learning)
     deadline = time.monotonic() + 120
     if learning in source_first.SEEDS:
@@ -54,7 +54,7 @@ def build_localized_message(level: str, learning: str, explanation: str):
         except RuntimeError:
             log.info('No suitable expression found in sampled %s audio', learning)
         else:
-            return phrases.Phrase(text, topic), clip, localized_caption(text, clip, level, learning, explanation)
+            return phrases.Phrase(text, topic), clip
     if learning == 'en':
         candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]
         # Once the finite curated bank is exhausted, try new generated
@@ -77,8 +77,13 @@ def build_localized_message(level: str, learning: str, explanation: str):
         except RuntimeError:
             log.info('No verified audio found for expression %r', text)
             continue
-        return phrases.Phrase(text, topic), clip, localized_caption(text, clip, level, learning, explanation)
+        return phrases.Phrase(text, topic), clip
     raise RuntimeError(f'No verified clip for {level}/{learning}')
+
+
+def build_localized_message(level: str, learning: str, explanation: str):
+    expression, clip = select_localized_clip(level, learning)
+    return expression, clip, localized_caption(expression.text, clip, level, learning, explanation)
 
 
 async def broadcast(bot: Bot, chat_ids: list[int], clip_path: str, caption: str) -> tuple[int, int]:
@@ -125,32 +130,48 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
     Clips must pass audio verification before delivery.
     """
     bot = Bot(token=config.bot_token)
-    groups: dict[tuple[str, str, str], list[dict]] = {}
+    groups: dict[tuple[str, str], dict[str, list[dict]]] = {}
     for sub in subscribers:
-        key = (sub['level'], sub['learning_language'], sub['explanation_language'])
-        groups.setdefault(key, []).append(sub)
+        key = (sub['level'], sub['learning_language'])
+        groups.setdefault(key, {}).setdefault(sub['explanation_language'], []).append(sub)
     failures = []
-    for (level, learning, explanation), group in groups.items():
+    for (level, learning), explanations in groups.items():
         try:
-            expression, clip, caption = build_localized_message(level, learning, explanation)
-            sent_count = 0
-            for sub in group:
-                if not db.still_due_with_settings(sub):
-                    log.info('Subscriber %s is no longer due with these settings', sub['chat_id'])
-                    continue
-                sent, failed = await broadcast(bot, [sub['chat_id']], str(clip.path), caption)
-                if sent:
-                    sent_count += 1
-                    if not db.advance_due_after_delivery(sub['chat_id'], sub['settings_updated_at']):
-                        log.info('Preferences changed during delivery; leaving new schedule unchanged')
-                elif failed:
-                    failures.append(f"chat {sub['chat_id']}")
-            if sent_count:
-                db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title, learning)
-            print(f'::notice title=Level {level} delivery::{sent_count} sent', flush=True)
+            expression, clip = select_localized_clip(level, learning)
         except Exception:
-            log.exception('Failed to process level %s', level)
-            failures.append(level)
+            log.exception('Failed to find content for %s/%s', level, learning)
+            failures.append(f'{level}/{learning}')
+            continue
+        sent_count = 0
+        for explanation, group in explanations.items():
+            try:
+                caption = localized_caption(expression.text, clip, level, learning, explanation)
+            except Exception:
+                log.exception('Failed to create explanation for %s/%s/%s', level, learning, explanation)
+                failures.append(f'{level}/{learning}/{explanation}')
+                continue
+            for sub in group:
+                try:
+                    if not db.still_due_with_settings(sub):
+                        log.info('Subscriber %s is no longer due with these settings', sub['chat_id'])
+                        continue
+                    sent, failed = await broadcast(bot, [sub['chat_id']], str(clip.path), caption)
+                    if sent:
+                        sent_count += 1
+                        if not db.advance_due_after_delivery(sub['chat_id'], sub['settings_updated_at']):
+                            log.info('New subscriber schedule was left unchanged')
+                    elif failed:
+                        failures.append(f"chat {sub['chat_id']}")
+                except Exception:
+                    log.exception('Failed delivery bookkeeping for chat %s', sub['chat_id'])
+                    failures.append(f"chat {sub['chat_id']}")
+        if sent_count:
+            try:
+                db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title, learning)
+            except Exception:
+                log.exception('Failed to record phrase for %s/%s', level, learning)
+                failures.append(f'{level}/{learning} history')
+        print(f'::notice title=Level {level} delivery::{sent_count} sent', flush=True)
     if failures:
         raise RuntimeError(f'Failed to deliver {len(failures)} group(s) or subscriber(s)')
 
