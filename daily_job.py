@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from telegram import Bot
 
 import db
 import phrases
 import clip_cafe
+import multilingual
+import source_first
 from config import config
 from groq_meaning import get_meaning
 
@@ -31,6 +34,56 @@ def build_message(level: str):
             raise ValueError('Telegram video caption exceeds 1024 characters')
         return expression, clip, caption
     raise RuntimeError(f'No matching movie clip for level {level}')
+
+
+def localized_caption(text: str, clip, level: str, learning: str, explanation: str) -> str:
+    meaning = multilingual.meaning(text, learning, explanation, level)
+    caption = f'🎬 {level} · {learning.upper()}\n\n{text}\n\n{meaning}\n\n🎞️ {clip.title}\n🔗 {clip.url}'
+    if len(caption) > 1024:
+        raise ValueError('Telegram video caption exceeds 1024 characters')
+    return caption
+
+
+def select_localized_clip(level: str, learning: str):
+    """Find an expression and verify its audio before returning its clip."""
+    seen, topics = db.phrase_history(level, learning)
+    deadline = time.monotonic() + 120
+    if learning in source_first.SEEDS:
+        try:
+            (text, topic), clip = source_first.find_expression_clip(learning, level, seen, topics)
+        except RuntimeError:
+            log.info('No suitable expression found in sampled %s audio', learning)
+        else:
+            return phrases.Phrase(text, topic), clip
+    if learning == 'en':
+        candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]
+        # Once the finite curated bank is exhausted, try new generated
+        # expressions before recycling the bank. Clip audio is still verified.
+        if all(p.text.casefold() in seen for p in phrases.BANK[level]):
+            try:
+                candidates = multilingual.expressions(learning, level, seen, topics) + candidates
+            except Exception:
+                log.warning('Could not generate fresh English expressions; using curated bank')
+    else:
+        candidates = multilingual.expressions(learning, level, seen, topics)
+    for text, topic in candidates:
+        if time.monotonic() >= deadline:
+            log.warning('Content search budget exhausted for %s/%s', level, learning)
+            break
+        try:
+            clip = clip_cafe.find_clip(
+                text, verify=lambda path, phrase: multilingual.verify_audio(path, phrase, learning),
+                audio_language=learning)
+        except RuntimeError:
+            log.info('No verified audio found for expression %r', text)
+            continue
+        return phrases.Phrase(text, topic), clip
+    raise RuntimeError(f'No verified clip for {level}/{learning}')
+
+
+def build_localized_message(level: str, learning: str, explanation: str):
+    expression, clip = select_localized_clip(level, learning)
+    return expression, clip, localized_caption(expression.text, clip, level, learning, explanation)
 
 
 async def broadcast(bot: Bot, chat_ids: list[int], clip_path: str, caption: str) -> tuple[int, int]:
@@ -70,15 +123,67 @@ async def run_groups(groups: dict[str, list[int]]) -> None:
         raise RuntimeError('Failed levels: ' + ', '.join(failures))
 
 
+
+async def run_due_subscribers(subscribers: list[dict]) -> None:
+    """Deliver only to due subscribers; advance each schedule after successful sends.
+
+    Clips must pass audio verification before delivery.
+    """
+    bot = Bot(token=config.bot_token)
+    groups: dict[tuple[str, str], dict[str, list[dict]]] = {}
+    for sub in subscribers:
+        key = (sub['level'], sub['learning_language'])
+        groups.setdefault(key, {}).setdefault(sub['explanation_language'], []).append(sub)
+    failures = []
+    for (level, learning), explanations in groups.items():
+        try:
+            expression, clip = select_localized_clip(level, learning)
+        except Exception:
+            log.exception('Failed to find content for %s/%s', level, learning)
+            failures.append(f'{level}/{learning}')
+            continue
+        sent_count = 0
+        for explanation, group in explanations.items():
+            try:
+                caption = localized_caption(expression.text, clip, level, learning, explanation)
+            except Exception:
+                log.exception('Failed to create explanation for %s/%s/%s', level, learning, explanation)
+                failures.append(f'{level}/{learning}/{explanation}')
+                continue
+            for sub in group:
+                try:
+                    if not db.still_due_with_settings(sub):
+                        log.info('Subscriber %s is no longer due with these settings', sub['chat_id'])
+                        continue
+                    sent, failed = await broadcast(bot, [sub['chat_id']], str(clip.path), caption)
+                    if sent:
+                        sent_count += 1
+                        if not db.advance_due_after_delivery(sub['chat_id'], sub['settings_updated_at']):
+                            log.info('New subscriber schedule was left unchanged')
+                    elif failed:
+                        failures.append(f"chat {sub['chat_id']}")
+                except Exception:
+                    log.exception('Failed delivery bookkeeping for chat %s', sub['chat_id'])
+                    failures.append(f"chat {sub['chat_id']}")
+        if sent_count:
+            try:
+                db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title, learning)
+            except Exception:
+                log.exception('Failed to record phrase for %s/%s', level, learning)
+                failures.append(f'{level}/{learning} history')
+        print(f'::notice title=Level {level} delivery::{sent_count} sent', flush=True)
+    if failures:
+        raise RuntimeError(f'Failed to deliver {len(failures)} group(s) or subscriber(s)')
+
 def main() -> None:
     config.validate('database_url', 'bot_token', 'groq_api_key')
     db.init_db()
-    groups = db.active_subscribers_by_level()
-    if not groups:
-        log.info('No active subscribers; no messages sent')
-        print('::notice title=Delivery::No active subscribers; no messages sent', flush=True)
+    subscribers = db.due_subscribers()
+    if not subscribers:
+        log.info('No subscribers due; no messages sent')
+        print('::notice title=Delivery::No subscribers due', flush=True)
         return
-    asyncio.run(run_groups(groups))
+    asyncio.run(run_due_subscribers(subscribers))
 
 
 if __name__ == '__main__':
