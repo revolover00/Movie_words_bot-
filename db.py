@@ -136,3 +136,53 @@ def mark_phrase_sent(level: str, phrase: str, topic: str, clip_id: str, title: s
             "INSERT INTO sent_phrases (level, phrase, topic, clip_id, video_title) VALUES (%s, %s, %s, %s, %s)",
             (level, phrase, topic, clip_id, title),
         )
+
+
+def due_subscribers() -> list[dict]:
+    """List active users due at the current database time, with their preferences.
+
+    This is a scheduling building block, not a delivery claim. The caller must
+    serialize scheduling runs and advance a user's due time only after delivery.
+    """
+    with connect() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT s.chat_id, s.level,
+                       COALESCE(p.learning_language, 'en') AS learning_language,
+                       COALESCE(p.explanation_language, 'ar') AS explanation_language,
+                       COALESCE(p.interval_minutes, 180) AS interval_minutes,
+                       p.updated_at AS settings_updated_at
+                FROM subscribers s
+                LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
+                WHERE s.is_active = TRUE
+                  AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()
+                ORDER BY COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours'), s.chat_id
+            """)
+            return [dict(row) for row in cur.fetchall()]
+
+
+def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:
+    """Advance only if preferences haven't changed during delivery.
+
+    New preference rows use the old three-hour default. Existing rows are
+    guarded by updated_at, so a concurrent settings change is not overwritten.
+    """
+    with connect() as conn, conn.cursor() as cur:
+        if settings_updated_at is None:
+            cur.execute("""
+                INSERT INTO subscriber_preferences (chat_id, next_due_at)
+                SELECT chat_id, now() + interval '3 hours' FROM subscribers
+                WHERE chat_id = %s AND is_active = TRUE
+                ON CONFLICT (chat_id) DO NOTHING
+                RETURNING chat_id
+            """, (chat_id,))
+        else:
+            cur.execute("""
+                UPDATE subscriber_preferences p
+                SET next_due_at = now() + p.interval_minutes * interval '1 minute'
+                FROM subscribers s
+                WHERE p.chat_id = %s AND s.chat_id = p.chat_id AND s.is_active = TRUE
+                  AND p.updated_at = %s
+                RETURNING p.chat_id
+            """, (chat_id, settings_updated_at))
+        return cur.fetchone() is not None

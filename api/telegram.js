@@ -26,7 +26,8 @@ async function withDb(fn) {
     )`);
     await client.query(`CREATE TABLE IF NOT EXISTS subscriber_preferences (
       chat_id BIGINT PRIMARY KEY REFERENCES subscribers(chat_id) ON DELETE CASCADE,
-      learning_language TEXT NOT NULL DEFAULT 'en', explanation_language TEXT NOT NULL DEFAULT 'ar',
+      learning_language TEXT NOT NULL DEFAULT 'en' CHECK (learning_language IN ('en','zh','hi','es','fr','ar','pt','ru','de','ja')),
+      explanation_language TEXT NOT NULL DEFAULT 'ar' CHECK (explanation_language IN ('en','zh','hi','es','fr','ar','pt','ru','de','ja')),
       interval_minutes INTEGER NOT NULL DEFAULT 180 CHECK (interval_minutes BETWEEN 5 AND 1440),
       next_due_at TIMESTAMPTZ, input_state TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
