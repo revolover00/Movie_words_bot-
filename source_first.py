@@ -54,7 +54,7 @@ def extract_expression(transcript: str, language: str, level: str, seen: set[str
 def find_expression_clip(language: str, level: str, seen: set[str], topics: list[str]):
     """Find a real clip first, then select a transcript-verified expression."""
     validate_language(language)
-    seeds = [(seed, language) for seed in SEEDS.get(language, ())]
+    seeds = [(seed, language) for seed in SEEDS.get(language, ())] if language != 'hi' else []
     # English subtitles can locate a scene even where the site's target-language
     # subtitle index is sparse (notably Hindi); audio is independently checked.
     seeds += [(seed, 'en') for seed in ('thank you', 'what happened', 'i dont know', 'lets go')]
@@ -70,7 +70,7 @@ def find_expression_clip(language: str, level: str, seen: set[str], topics: list
             chosen = extract_expression(transcript, language, level, seen, topics)
             return chosen is not None
         try:
-            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language, search_language=search_language, max_results=5, max_seconds=30)
+            clip = clip_cafe.find_clip(seed, verify=verify, audio_language=language, search_language=search_language, max_results=8, max_seconds=30)
         except RuntimeError:
             continue
         if chosen is not None:

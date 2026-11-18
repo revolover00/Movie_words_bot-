@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import random
 import time
 import unicodedata
 from dataclasses import dataclass
@@ -124,7 +125,15 @@ def search_links(phrase: str, audio_language: str | None, search_language: str |
     seen = set()
     for query in queries:
         result = page(BASE + '?' + urlencode(query))
-        for link in result.links[:limit]:
+        links = list(dict.fromkeys(result.links[:30]))
+        if len(links) > limit and limit < 15:
+            # Keep some top-ranked clips and sample beyond them so repeated
+            # bounded retries can discover other actual audio tracks.
+            first = (limit + 1) // 2
+            links = links[:first] + random.sample(links[first:], limit - first)
+        else:
+            links = links[:limit]
+        for link in links:
             if link not in seen:
                 seen.add(link)
                 yield link
