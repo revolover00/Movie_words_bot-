@@ -53,6 +53,8 @@ def find_word_time(cues: list[tuple[float, float, str]], word: str) -> tuple[flo
 
 def _run(cmd: list[str]) -> None:
     log.info("Running: %s", " ".join(cmd))
+    if cmd[0] == "yt-dlp":
+        cmd = [cmd[0], "--js-runtimes", "node", *cmd[1:]]
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as exc:
