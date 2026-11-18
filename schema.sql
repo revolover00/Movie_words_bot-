@@ -15,3 +15,17 @@ CREATE TABLE IF NOT EXISTS sent_words (
     video_title TEXT,
     sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Keep existing subscribers and give them a sensible default level.
+ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS level TEXT NOT NULL DEFAULT 'A2';
+
+CREATE TABLE IF NOT EXISTS sent_phrases (
+    id BIGSERIAL PRIMARY KEY,
+    level TEXT NOT NULL,
+    phrase TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    clip_id TEXT,
+    video_title TEXT,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sent_phrases_level_sent_at_idx ON sent_phrases (level, sent_at DESC);

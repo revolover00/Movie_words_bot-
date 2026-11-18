@@ -33,7 +33,7 @@ class Config:
     bot_token: str = _get("BOT_TOKEN")
     database_url: str = _get("DATABASE_URL")
     groq_api_key: str = _get("GROQ_API_KEY")
-    groq_model: str = _get("GROQ_MODEL", "llama-3.1-8b-instant")
+    groq_model: str = _get("GROQ_MODEL", "qwen/qwen3.8-27b")
     words_file: str = _get("WORDS_FILE", "words.txt")
     clip_before: int = _get_int("CLIP_BEFORE", 2)
     clip_after: int = _get_int("CLIP_AFTER", 3)
