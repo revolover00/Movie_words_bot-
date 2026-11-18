@@ -7,7 +7,7 @@ A free, open-source Telegram bot that sends subscribers **one English word per d
 ## How it works
 
 ```
-cron-job.org (daily 9 AM Cairo)
+cron-job.org (every 3 hours)
     │  POST → GitHub API (repository_dispatch)
     ▼
 GitHub Actions (free ephemeral runner)
@@ -28,7 +28,7 @@ New users subscribe via `/start` (handled by `bot.py` with long polling).
 
 | Tool | Role |
 | --- | --- |
-| cron-job.org | Daily alarm (HTTP POST) |
+| cron-job.org | Every 3 hours (HTTP POST) |
 | GitHub Actions | Free ephemeral worker |
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
@@ -104,18 +104,18 @@ python daily_job.py  # sends today's word immediately
 
 1. Push this repo to GitHub (public repo → free Actions minutes).
 2. Add secrets: **Settings → Secrets and variables → Actions** → `BOT_TOKEN`, `DATABASE_URL`, `GROQ_API_KEY`.
-3. The workflow in `.github/workflows/daily.yml` already runs daily at 6:00 AM UTC (≈ 9 AM Cairo in winter). You can also trigger it manually from the **Actions** tab.
+3. Merge the workflow into the default branch. You can also trigger it manually from the **Actions** tab.
 
-### 8. (Optional) Trigger via cron-job.org
+### 8. Schedule via cron-job.org
 
-Create a free job on [cron-job.org](https://cron-job.org) that POSTs to:
+Create a free job on [cron-job.org](https://cron-job.org) scheduled every 3 hours that POSTs to:
 
 ```
 https://api.github.com/repos/<OWNER>/<REPO>/dispatches
 ```
 
-with header `Authorization: Bearer <PAT>` and body `{"event_type": "daily-word"}`.
-The PAT needs `repo` scope (classic) or `actions:write` (fine-grained).
+with headers `Authorization: Bearer <PAT>`, `Accept: application/vnd.github+json`, and `Content-Type: application/json`, and body `{"event_type": "daily-word"}`.
+The PAT needs `repo` scope (classic) or repository Contents read and write permission (fine-grained). The workflow must exist on the default branch. Store the token only in the scheduler, not in the repository.
 
 ## Environment variables
 
