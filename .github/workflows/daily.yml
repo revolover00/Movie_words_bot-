@@ -1,10 +1,6 @@
 name: Daily Word
 
 on:
-  schedule:
-    # 9:00 AM Cairo time (6:00 AM UTC in winter / 7:00 AM UTC in summer).
-    # GitHub cron is UTC-only, so this fires at 6:00 AM UTC year-round.
-    - cron: "0 6 * * *"
   repository_dispatch:
     types: [daily-word]
   workflow_dispatch:
