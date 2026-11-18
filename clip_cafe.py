@@ -95,14 +95,14 @@ def allowed(url: str) -> bool:
     return parsed.scheme == 'https' and parsed.hostname == 'clip.cafe'
 
 
-def search_links(phrase: str, audio_language: str | None):
+def search_links(phrase: str, audio_language: str | None, search_language: str | None = None):
     """Prefer source language filters, then try unrestricted results.
 
     Source metadata is not proof of the MP4's spoken language; callers must
     verify audio before accepting multilingual clips.
     """
     base = {'s': f'"{phrase}"', 'usersearch': '1', 'ss': 's'}
-    queries = ([dict(base, audio=audio_language, sl=audio_language), base]
+    queries = ([dict(base, audio=audio_language, sl=search_language or audio_language), base]
                if audio_language else [base])
     seen = set()
     for query in queries:
@@ -113,8 +113,8 @@ def search_links(phrase: str, audio_language: str | None):
                 yield link
 
 
-def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None) -> Clip:
-    for link in search_links(phrase, audio_language):
+def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None, search_language: str | None = None) -> Clip:
+    for link in search_links(phrase, audio_language, search_language):
         url = urljoin(BASE, link)
         if not allowed(url):
             continue
