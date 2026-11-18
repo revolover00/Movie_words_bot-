@@ -1,39 +1,42 @@
 # Movie Word Bot 🎬
 
-A free, open-source Telegram bot that sends useful English expressions with a matching short movie clip and an Egyptian Arabic explanation. Subscribers choose a CEFR level from A2 through C2.
+A free, open-source Telegram bot for useful expressions with matching short movie clips and explanations. Subscribers choose a CEFR level, learning language, explanation language and delivery interval inside Telegram.
 
-> Learn English by watching movies — expressions for your level, zero self-hosting.
+> Learn languages by watching movies — expressions for your level, zero self-hosting.
+
+> **Multilingual rollout is experimental.** Clip availability varies by language, automatic audio verification is imperfect, and free-tier rate limits and worker duration can delay or prevent delivery. The scheduler is not exactly-once; failures between a Telegram send and the database update can cause duplicates. Test your setup before enabling production delivery.
 
 ## How it works
 
 ```
-cron-job.org (every 3 hours)
+cron-job.org (every 2 minutes)
     │  POST → GitHub API (repository_dispatch)
     ▼
 GitHub Actions (free ephemeral runner)
     │
     ▼
 daily_job.py
-    ├─ Curated phrases → expression for each active CEFR level
-    ├─ Groq API        → Egyptian Arabic explanation + example
-    ├─ Clip.Cafe       → find a quote containing the expression and download its clip
-    ├─ Neon Postgres   → subscriber levels + sent expressions
+    ├─ Neon Postgres   → due subscribers and their preferences
+    ├─ Expressions     → curated candidates or transcript-first selection by CEFR level
+    ├─ Clip.Cafe       → search and download a clip with a matching audio track
+    ├─ Groq Whisper    → verify spoken language and phrase (best effort)
+    ├─ Groq Qwen       → localized explanation and example
     ▼
-Telegram Bot API       → send each level’s clip to its subscribers
+Telegram Bot API       → send to each due subscriber
 ```
 
-New users subscribe with `/start` and pick a level. `/level` changes it at any time, `/today` shows the latest expression for that level, and `/stop` unsubscribes. Existing subscribers default to A2 and keep their subscription. CEFR labels are approximate, and the curated bank rotates topics and avoids repeats until exhausted.
+Use `/start` to subscribe, `/level` to pick A2–C2, `/learn` for the learning language, `/explain` for the explanation language, and `/interval` for a whole number of minutes from 5 to 1440. `/today` shows the most recent expression for the selected level and learning language; `/stop` unsubscribes. Both language menus offer English, Chinese, Hindi, Spanish, French, Arabic, Portuguese, Russian, German and Japanese. Existing subscribers retain their subscription and default to English, Egyptian Arabic and 180 minutes. CEFR labels are approximate.
 
 ## Stack
 
 | Tool | Role |
 | --- | --- |
-| cron-job.org | Every 3 hours (HTTP POST) |
+| cron-job.org | Every 2 minutes (HTTP POST) |
 | GitHub Actions | Free ephemeral worker |
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
 | Clip.Cafe | Movie quote search and short clips |
-| Groq API (`qwen/qwen3.8-27b`) | Explanations and examples |
+| Groq API (`qwen/qwen3.8-27b`, Whisper) | Expressions, explanations and audio verification |
 
 ## Setup
 
@@ -76,7 +79,7 @@ https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-app>.vercel.app
 ```
 
 Telegram replies `{"ok":true,...}` — done. The function in `api/telegram.js`
-handles `/start`, `/level`, `/stop`, `/help`, `/today` and talks to Neon over TLS. The webhook and the scheduled job apply the additive level/history migration automatically.
+handles the Telegram controls and talks to Neon over TLS. The webhook and scheduled job apply additive migrations automatically.
 
 ### 5b. Legacy Cloudflare Worker (does not support levels)
 
@@ -94,9 +97,11 @@ For local testing you can still run `python bot.py` (polling) instead.
 
 ### 6. Run locally (optional)
 
+Install FFmpeg (including `ffprobe`) for the stream-language precheck.
+
 ```bash
 pip install -r requirements.txt
-python daily_job.py  # sends one expression to each active level group
+python daily_job.py  # sends to subscribers whose delivery time is due
 ```
 
 ### 7. Automate with GitHub Actions
@@ -107,14 +112,14 @@ python daily_job.py  # sends one expression to each active level group
 
 ### 8. Schedule via cron-job.org
 
-Create a free job on [cron-job.org](https://cron-job.org) scheduled every 3 hours that POSTs to:
+Create a free job on [cron-job.org](https://cron-job.org) scheduled every 2 minutes that POSTs to:
 
 ```
 https://api.github.com/repos/<OWNER>/<REPO>/dispatches
 ```
 
 with headers `Authorization: Bearer <PAT>`, `Accept: application/vnd.github+json`, and `Content-Type: application/json`, and body `{"event_type": "daily-word"}`.
-The PAT needs `repo` scope (classic) or repository Contents read and write permission (fine-grained). The workflow must exist on the default branch. Store the token only in the scheduler, not in the repository.
+The PAT needs `repo` scope (classic) or repository Contents read and write permission (fine-grained). The workflow must exist on the default branch and be enabled. Store the token only in the scheduler, not in the repository. This polling interval is not a delivery-time guarantee: Actions queueing, source availability, verification and rate limits can delay or prevent messages.
 
 ## Environment variables
 
@@ -154,12 +159,15 @@ tests/               # pytest suite
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest -q
+npm ci
+node --test tests/telegram.test.js
 ```
 
 ## Notes
 
-- Clip.Cafe integration parses public web pages, which may change or become unavailable.
-- Words are English by default; meanings come in Egyptian Arabic. To switch languages, edit `words.txt` and the prompt in `groq_meaning.py`.
+- Clip.Cafe integration parses public pages and HLS playlists, which may change or become unavailable. A localized audio track is combined with the video when available; otherwise the original MP4 is checked.
+- English expressions use a curated bank, with generated candidates after it is exhausted. Other languages prefer expressions selected from a verified transcript, then fall back to generated candidates. Clips are only sent after best-effort audio verification. Some language/level combinations may have no usable clip.
+- Serialized Actions runs and a pre-send settings check reduce races, but Telegram sends and database updates cannot be atomic. Long-running jobs can delay individual schedules; provider free tiers impose usage limits.
 - Clips are short excerpts from Clip.Cafe for educational use.
 
 ## License
