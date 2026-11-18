@@ -23,7 +23,7 @@ DETECTED_NAMES = {
 
 def client() -> OpenAI:
     config.validate('groq_api_key')
-    return OpenAI(base_url='https://api.groq.com/openai/v1', api_key=config.groq_api_key)
+    return OpenAI(base_url='https://api.groq.com/openai/v1', api_key=config.groq_api_key, timeout=30, max_retries=1)
 
 
 def expressions(language: str, level: str, seen: set[str], recent_topics: list[str]) -> list[tuple[str, str]]:
