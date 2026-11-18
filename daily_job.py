@@ -70,15 +70,53 @@ async def run_groups(groups: dict[str, list[int]]) -> None:
         raise RuntimeError('Failed levels: ' + ', '.join(failures))
 
 
+
+async def run_due_subscribers(subscribers: list[dict]) -> None:
+    """Deliver only to due subscribers; advance each schedule after successful sends.
+
+    Multilingual generation is not yet enabled; fail closed for unsupported
+    settings rather than send an expression in the wrong language.
+    """
+    bot = Bot(token=config.bot_token)
+    groups: dict[tuple[str, str, str], list[dict]] = {}
+    for sub in subscribers:
+        key = (sub['level'], sub['learning_language'], sub['explanation_language'])
+        groups.setdefault(key, []).append(sub)
+    failures = []
+    for (level, learning, explanation), group in groups.items():
+        if (learning, explanation) != ('en', 'ar'):
+            log.error('Multilingual content is not yet supported: %s / %s', learning, explanation)
+            failures.append(f'{level}/{learning}/{explanation}')
+            continue
+        try:
+            expression, clip, caption = build_message(level)
+            sent_count = 0
+            for sub in group:
+                sent, failed = await broadcast(bot, [sub['chat_id']], str(clip.path), caption)
+                if sent:
+                    sent_count += 1
+                    if not db.advance_due_after_delivery(sub['chat_id'], sub['settings_updated_at']):
+                        log.info('Preferences changed during delivery; leaving new schedule unchanged')
+                elif failed:
+                    failures.append(f"chat {sub['chat_id']}")
+            if sent_count:
+                db.mark_phrase_sent(level, expression.text, expression.topic, clip.clip_id, clip.title)
+            print(f'::notice title=Level {level} delivery::{sent_count} sent', flush=True)
+        except Exception:
+            log.exception('Failed to process level %s', level)
+            failures.append(level)
+    if failures:
+        raise RuntimeError(f'Failed to deliver {len(failures)} group(s) or subscriber(s)')
+
 def main() -> None:
     config.validate('database_url', 'bot_token', 'groq_api_key')
     db.init_db()
-    groups = db.active_subscribers_by_level()
-    if not groups:
-        log.info('No active subscribers; no messages sent')
-        print('::notice title=Delivery::No active subscribers; no messages sent', flush=True)
+    subscribers = db.due_subscribers()
+    if not subscribers:
+        log.info('No subscribers due; no messages sent')
+        print('::notice title=Delivery::No subscribers due', flush=True)
         return
-    asyncio.run(run_groups(groups))
+    asyncio.run(run_due_subscribers(subscribers))
 
 
 if __name__ == '__main__':
