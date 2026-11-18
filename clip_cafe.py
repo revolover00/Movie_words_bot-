@@ -52,13 +52,28 @@ def page(url):
 
 def matches(phrase: str, quote: str) -> bool:
     """Require all expression words in order, ignoring punctuation and case."""
-    def normalize(text: str) -> str:
-        # Strip diacritics so equivalent subtitle spellings still match.
-        text = unicodedata.normalize('NFKD', text.casefold())
-        return ''.join(c for c in text if not unicodedata.combining(c))
+    def tokenize(text: str) -> list[str]:
+        # Fold Latin accents but preserve combining marks in scripts where
+        # they are essential to meaning (e.g. Hindi vowel signs).
+        result, current = [], []
+        latin = False
+        for char in unicodedata.normalize('NFKD', text.casefold()):
+            if unicodedata.category(char).startswith('M'):
+                if current and not latin:
+                    current.append(char)
+            elif char.isalnum():
+                current.append(char)
+                latin = 'LATIN' in unicodedata.name(char, '')
+            elif current:
+                result.append(''.join(current))
+                current = []
+                latin = False
+        if current:
+            result.append(''.join(current))
+        return result
 
-    tokens = re.findall(r'[^\W_]+', normalize(phrase), re.UNICODE)
-    words = re.findall(r'[^\W_]+', normalize(quote), re.UNICODE)
+    tokens = tokenize(phrase)
+    words = tokenize(quote)
     if not tokens:
         return False
     # CJK scripts commonly omit spaces between words; match the continuous
