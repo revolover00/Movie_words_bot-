@@ -164,3 +164,28 @@ def test_same_learning_group_reuses_clip_across_explanation_languages(monkeypatc
     asyncio.run(daily_job.run_due_subscribers(users))
     assert selected == [('A2', 'ja')]
     assert captions == ['ar', 'en'] and len(marked) == 1
+
+
+def test_failed_explanation_does_not_block_other_languages(monkeypatch):
+    import pytest
+    users = [dict(chat_id=i, level='A2', learning_language='ja', explanation_language=exp, settings_updated_at=None)
+             for i, exp in [(1, 'ar'), (2, 'en')]]
+    clip = SimpleNamespace(path='/clip', clip_id='id', title='Movie')
+    sent, marked = [], []
+    monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
+    monkeypatch.setattr(daily_job, 'select_localized_clip', lambda *args: (phrases.BANK['A2'][0], clip))
+    def caption(text, clip, level, learning, explanation):
+        if explanation == 'ar':
+            raise RuntimeError('temporary error')
+        return 'caption'
+    monkeypatch.setattr(daily_job, 'localized_caption', caption)
+    monkeypatch.setattr(daily_job.db, 'still_due_with_settings', lambda sub: True)
+    monkeypatch.setattr(daily_job.db, 'advance_due_after_delivery', lambda *args: True)
+    monkeypatch.setattr(daily_job.db, 'mark_phrase_sent', lambda *args: marked.append(args))
+    async def send(bot, ids, path, caption):
+        sent.extend(ids)
+        return 1, 0
+    monkeypatch.setattr(daily_job, 'broadcast', send)
+    with pytest.raises(RuntimeError):
+        asyncio.run(daily_job.run_due_subscribers(users))
+    assert sent == [2] and len(marked) == 1
