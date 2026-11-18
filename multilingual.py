@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+import shutil
+import re
 from pathlib import Path
 
 from openai import OpenAI
@@ -11,6 +13,7 @@ from openai import OpenAI
 from clip_cafe import matches
 from config import config
 from preferences import LANGUAGES, validate_language
+from media_tools import ffmpeg_executable
 
 log = logging.getLogger(__name__)
 NAMES = {item['code']: item['name'] for item in LANGUAGES}
@@ -92,16 +95,26 @@ STREAM_LANGUAGES = {
 
 def likely_audio_language(path: Path, language: str) -> bool:
     try:
-        result = subprocess.run(
-            ['ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_entries',
-             'stream_tags=language', '-of', 'json', str(path)],
-            capture_output=True, text=True, timeout=10, check=True,
-        )
-        streams = json.loads(result.stdout).get('streams', [])
-        tag = (streams[0].get('tags', {}).get('language', '') if streams else '').lower()
+        probe = shutil.which('ffprobe')
+        if probe:
+            result = subprocess.run(
+                [probe, '-v', 'error', '-select_streams', 'a:0', '-show_entries',
+                 'stream_tags=language', '-of', 'json', str(path)],
+                capture_output=True, text=True, timeout=10, check=True,
+            )
+            streams = json.loads(result.stdout).get('streams', [])
+            tag = (streams[0].get('tags', {}).get('language', '') if streams else '').lower()
+        else:
+            # The bundled FFmpeg does not include ffprobe. Its inspection
+            # output still reports stream language when one is present.
+            result = subprocess.run([ffmpeg_executable(), '-hide_banner', '-i', str(path)],
+                                    capture_output=True, text=True, timeout=10)
+            match = re.search(r'Stream #\d+:\d+\(([A-Za-z]{3})\).*?Audio:', result.stderr)
+            tag = match.group(1).lower() if match else ''
         return not tag or tag == 'und' or tag in STREAM_LANGUAGES[language]
-    except (OSError, subprocess.SubprocessError, ValueError, TypeError, AttributeError):
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError, AttributeError, ImportError):
         return True
+
 
 
 def transcript_for_language(path: Path, language: str) -> str | None:
