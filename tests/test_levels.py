@@ -49,3 +49,34 @@ def test_failed_delivery_does_not_mark_expression(monkeypatch):
     with pytest.raises(RuntimeError, match='A2'):
         asyncio.run(daily_job.run_groups({'A2': [1]}))
     assert not marked
+
+
+def test_only_due_users_are_sent_and_advanced(monkeypatch):
+    sent, advanced, marked = [], [], []
+    users = [dict(chat_id=12, level='A2', learning_language='en', explanation_language='ar', settings_updated_at='v1'),
+             dict(chat_id=13, level='A2', learning_language='en', explanation_language='ar', settings_updated_at=None)]
+    monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
+    monkeypatch.setattr(daily_job, 'build_message', lambda level: (
+        phrases.BANK[level][0], SimpleNamespace(path='/clip', clip_id='id', title='Movie'), 'caption'))
+    async def send(bot, ids, path, caption):
+        sent.extend(ids)
+        return (1, 0) if ids == [12] else (0, 1)
+    monkeypatch.setattr(daily_job, 'broadcast', send)
+    monkeypatch.setattr(daily_job.db, 'advance_due_after_delivery', lambda *args: advanced.append(args) or True)
+    monkeypatch.setattr(daily_job.db, 'mark_phrase_sent', lambda *args: marked.append(args))
+    import pytest
+    with pytest.raises(RuntimeError):
+        asyncio.run(daily_job.run_due_subscribers(users))
+    assert sent == [12, 13]
+    assert advanced == [(12, 'v1')]
+    assert len(marked) == 1
+
+
+def test_unsupported_language_fails_without_sending(monkeypatch):
+    import pytest
+    monkeypatch.setattr(daily_job, 'Bot', lambda **kwargs: object())
+    send = AsyncMock()
+    monkeypatch.setattr(daily_job, 'broadcast', send)
+    with pytest.raises(RuntimeError):
+        asyncio.run(daily_job.run_due_subscribers([dict(chat_id=1, level='A2', learning_language='ja', explanation_language='ar', settings_updated_at=None)]))
+    send.assert_not_called()
