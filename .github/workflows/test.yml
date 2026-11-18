@@ -20,3 +20,17 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: node --test tests/telegram.test.js
+
+  one-off-diagnostics:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/arena/e5deedb5-movie-words-bot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python scripts/probe_database_temp.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: python scripts/probe_hindi_results.py
