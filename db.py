@@ -123,18 +123,18 @@ def active_subscribers_by_level() -> dict[str, list[int]]:
         return groups
 
 
-def phrase_history(level: str) -> tuple[set[str], list[str]]:
+def phrase_history(level: str, language: str = 'en') -> tuple[set[str], list[str]]:
     with connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT phrase, topic FROM sent_phrases WHERE level = %s ORDER BY sent_at DESC", (level,))
+        cur.execute("SELECT phrase, topic FROM sent_phrases WHERE level = %s AND learning_language = %s ORDER BY sent_at DESC", (level, language))
         rows = cur.fetchall()
         return {row[0].casefold() for row in rows}, [row[1] for row in rows[:3]]
 
 
-def mark_phrase_sent(level: str, phrase: str, topic: str, clip_id: str, title: str) -> None:
+def mark_phrase_sent(level: str, phrase: str, topic: str, clip_id: str, title: str, language: str = 'en') -> None:
     with connect() as conn, conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO sent_phrases (level, phrase, topic, clip_id, video_title) VALUES (%s, %s, %s, %s, %s)",
-            (level, phrase, topic, clip_id, title),
+            "INSERT INTO sent_phrases (level, phrase, topic, clip_id, video_title, learning_language) VALUES (%s, %s, %s, %s, %s, %s)",
+            (level, phrase, topic, clip_id, title, language),
         )
 
 
