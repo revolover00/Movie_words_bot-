@@ -26,3 +26,9 @@ def test_parse_search_and_metadata():
     assert p.meta['og:description'] == 'Nice & easy'
     assert allowed(p.meta['og:video'])
     assert not allowed('https://clip.cafe.evil.example/videos/a.mp4')
+
+
+def test_result_audio_languages_are_indexed():
+    parser = PageParser()
+    parser.feed('<picture data-link="movie/a/"></picture><span aria-label="Audio: French, English"></span>')
+    assert parser.audio_languages['movie/a/'] == {'french', 'english'}
