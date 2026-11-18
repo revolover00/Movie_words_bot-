@@ -17,7 +17,7 @@ GitHub Actions (free ephemeral runner)
     ▼
 daily_job.py
     ├─ Neon Postgres   → due subscribers and their preferences
-    ├─ Expressions     → CEFR-level candidates for each learning language
+    ├─ Expressions     → curated candidates or transcript-first selection by CEFR level
     ├─ Clip.Cafe       → search and download a clip with a matching audio track
     ├─ Groq Whisper    → verify spoken language and phrase (best effort)
     ├─ Groq Qwen       → localized explanation and example
@@ -166,7 +166,7 @@ node --test tests/telegram.test.js
 ## Notes
 
 - Clip.Cafe integration parses public pages and HLS playlists, which may change or become unavailable. A localized audio track is combined with the video when available; otherwise the original MP4 is checked.
-- English expressions use a curated bank, with generated candidates after it is exhausted; other learning languages use generated candidates. Clips are only sent after best-effort audio verification. Some language/level combinations may have no usable clip.
+- English expressions use a curated bank, with generated candidates after it is exhausted. Other languages prefer expressions selected from a verified transcript, then fall back to generated candidates. Clips are only sent after best-effort audio verification. Some language/level combinations may have no usable clip.
 - Serialized Actions runs and a pre-send settings check reduce races, but Telegram sends and database updates cannot be atomic. Long-running jobs can delay individual schedules; provider free tiers impose usage limits.
 - Clips are short excerpts from Clip.Cafe for educational use.
 
