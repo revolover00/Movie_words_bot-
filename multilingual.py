@@ -52,7 +52,10 @@ def expressions(language: str, level: str, seen: set[str], recent_topics: list[s
         if not isinstance(text, str) or not isinstance(topic, str):
             continue
         text, topic = text.strip(), topic.strip()
-        if 2 <= len(text) <= 100 and 1 <= len(topic) <= 50 and '\n' not in text and text.casefold() not in seen:
+        # Chinese and Japanese do not reliably separate words with spaces.
+        multiword = language in {'zh', 'ja'} or len(text.split()) >= 2
+        if (multiword and 2 <= len(text) <= 100 and 1 <= len(topic) <= 50
+                and '\n' not in text and text.casefold() not in seen):
             result.append((text, topic))
     if not result:
         raise ValueError('Model returned no valid new expressions')
