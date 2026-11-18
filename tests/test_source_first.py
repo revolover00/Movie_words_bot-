@@ -25,7 +25,7 @@ def test_source_first_never_accepts_wrong_language_or_phrase(monkeypatch, tmp_pa
     monkeypatch.setattr(source_first.multilingual, 'transcript_for_language', lambda *args: 'さようなら')
     monkeypatch.setattr(source_first.random, 'shuffle', lambda x: None)
     monkeypatch.setattr(source_first, 'extract_expression', lambda *args: None)
-    def search(seed, verify, audio_language, search_language, max_results):
+    def search(seed, verify, audio_language, search_language, max_results, max_seconds):
         assert audio_language == 'ja'
         assert not verify(tmp_path / 'test.mp4', seed)
         raise RuntimeError('none')
@@ -40,7 +40,7 @@ def test_english_search_can_select_verified_target_audio(monkeypatch, tmp_path):
     monkeypatch.setattr(source_first.multilingual, 'transcript_for_language', lambda *args: 'बहुत बहुत धन्यवाद')
     monkeypatch.setattr(source_first, 'extract_expression', lambda *args: ('बहुत बहुत धन्यवाद', 'gratitude'))
     clip = object()
-    def search(seed, verify, audio_language, search_language, max_results):
+    def search(seed, verify, audio_language, search_language, max_results, max_seconds):
         assert audio_language == 'hi' and search_language == 'en'
         assert verify(tmp_path / 'test.mp4', seed)
         return clip

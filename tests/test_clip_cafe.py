@@ -75,3 +75,14 @@ def test_search_language_can_differ_from_audio(monkeypatch):
     list(clip_cafe.search_links('thank you', 'hi', 'en'))
     query = parse_qs(urlparse(urls[0]).query)
     assert query['audio'] == ['hi'] and query['sl'] == ['en']
+
+
+def test_clip_search_stops_after_time_budget(monkeypatch, tmp_path):
+    import clip_cafe
+    import pytest
+    ticks = iter([100, 146])
+    monkeypatch.setattr(clip_cafe.time, 'monotonic', lambda: next(ticks))
+    monkeypatch.setattr(clip_cafe, 'search_links', lambda *args: iter(['movie/a/']))
+    monkeypatch.setattr(clip_cafe, 'page', lambda *args: pytest.fail('Should stop before downloading'))
+    with pytest.raises(RuntimeError):
+        clip_cafe.find_clip('hello', tmp_path, max_seconds=45)
