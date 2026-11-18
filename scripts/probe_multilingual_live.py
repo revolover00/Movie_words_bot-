@@ -15,12 +15,6 @@ results = []
 with TemporaryDirectory() as out:
     for lang, phrase in examples.items():
         try:
-            options = expressions(lang, 'A2', set(), [])
-            text = meaning(phrase, lang, 'ar', 'A2')
-            results.append(f'{lang}:text=ok')
-        except Exception as exc:
-            results.append(f'{lang}:text={type(exc).__name__}')
-        try:
             clip = find_clip(phrase, Path(out), verify=lambda path, text: verify_audio(path, text, lang), audio_language=lang)
             results.append(f'{lang}:audio=ok')
         except Exception as exc:

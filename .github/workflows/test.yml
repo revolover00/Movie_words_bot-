@@ -21,9 +21,16 @@ jobs:
       - run: npm ci
       - run: node --test tests/telegram.test.js
 
-  inspect-source:
+  live-probe:
     if: github.event_name == 'push' && github.ref == 'refs/heads/arena/e5deedb5-movie-words-bot'
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - run: python scripts/inspect_search_filters.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python scripts/probe_multilingual_live.py
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
