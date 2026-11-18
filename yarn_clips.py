@@ -6,9 +6,10 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
-import requests
 
 log = logging.getLogger(__name__)
 BASE = 'https://yarn.co'
@@ -27,10 +28,13 @@ class YarnClip:
     path: Path
 
 
-def _get(url: str, **kwargs):
-    response = requests.get(url, headers=HEADERS, timeout=(10, 30), **kwargs)
-    response.raise_for_status()
-    return response
+def _get(url: str):
+    return urlopen(Request(url, headers=HEADERS), timeout=30)
+
+
+def _get_text(url: str) -> str:
+    with _get(url) as response:
+        return response.read().decode("utf-8", "replace")
 
 
 def _parse_title(page: str, word: str) -> tuple[str, str] | None:
@@ -48,12 +52,12 @@ def _parse_title(page: str, word: str) -> tuple[str, str] | None:
 
 def find_clip(word: str, out_dir: Path = Path('clips')) -> YarnClip:
     """Find a quote matching the whole word; never use an unrelated fallback."""
-    response = _get(f'{BASE}/yarn-find', params={'text': word, 'type': 'movies'})
-    ids = list(dict.fromkeys(CLIP_ID.findall(response.text)))[:20]
+    search_url = f"{BASE}/yarn-find?{urlencode({'text': word, 'type': 'movies'})}"
+    ids = list(dict.fromkeys(CLIP_ID.findall(_get_text(search_url))))[:20]
     for clip_id in ids:
         url = f'{BASE}/yarn-clip/{clip_id}'
         try:
-            page = _get(url).text
+            page = _get_text(url)
             parsed = _parse_title(page, word)
             if not parsed:
                 continue
@@ -64,7 +68,7 @@ def find_clip(word: str, out_dir: Path = Path('clips')) -> YarnClip:
             host = urlparse(video_url).hostname or ''
             if host != 'yarn.co' and not host.endswith('.yarn.co'):
                 continue
-            with _get(video_url, stream=True) as video:
+            with _get(video_url) as video:
                 final = urlparse(video.url)
                 if final.scheme != 'https' or not (final.hostname == 'yarn.co' or (final.hostname or '').endswith('.yarn.co')):
                     raise ValueError('unexpected video host')
@@ -73,7 +77,7 @@ def find_clip(word: str, out_dir: Path = Path('clips')) -> YarnClip:
                 size = 0
                 try:
                     with path.open('wb') as f:
-                        for chunk in video.iter_content(65536):
+                        for chunk in iter(lambda: video.read(65536), b''):
                             size += len(chunk)
                             if size > MAX_BYTES:
                                 raise ValueError('Yarn video exceeds size limit')
@@ -88,6 +92,6 @@ def find_clip(word: str, out_dir: Path = Path('clips')) -> YarnClip:
             quote, title = parsed
             log.info('Selected Yarn clip %s: %s', clip_id, title)
             return YarnClip(clip_id, title, quote, url, path)
-        except (requests.RequestException, ValueError, OSError) as exc:
+        except (URLError, ValueError, OSError) as exc:
             log.warning('Could not use Yarn clip %s: %s', clip_id, exc)
     raise RuntimeError(f'No downloadable movie clip with the word {word!r} found on Yarn')
