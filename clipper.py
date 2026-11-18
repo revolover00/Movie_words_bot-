@@ -53,7 +53,11 @@ def find_word_time(cues: list[tuple[float, float, str]], word: str) -> tuple[flo
 
 def _run(cmd: list[str]) -> None:
     log.info("Running: %s", " ".join(cmd))
-    subprocess.run(cmd, check=True, capture_output=True, text=True)
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        log.error("Command failed: %s", (exc.stderr or "").strip()[-2000:])
+        raise
 
 
 def fetch_subtitles(video_id: str, tmp: Path) -> list[tuple[float, float, str]]:
