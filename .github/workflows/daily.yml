@@ -4,9 +4,22 @@ on:
   repository_dispatch:
     types: [daily-word]
   workflow_dispatch:
+    inputs:
+      probe_yarn:
+        description: Test Yarn without sending messages
+        type: boolean
+        default: false
 
 jobs:
+  probe-yarn:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.probe_yarn }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/probe_yarn.py
+
   send:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.probe_yarn }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
