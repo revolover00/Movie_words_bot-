@@ -44,7 +44,8 @@ def build_localized_message(level: str, learning: str, explanation: str):
     for text, topic in candidates:
         try:
             clip = clip_cafe.find_clip(
-                text, verify=lambda path, phrase: multilingual.verify_audio(path, phrase, learning))
+                text, verify=lambda path, phrase: multilingual.verify_audio(path, phrase, learning),
+                audio_language=multilingual.NAMES[learning].replace("Mandarin Chinese", "Chinese"))
         except RuntimeError:
             log.info('No verified audio found for expression %r', text)
             continue

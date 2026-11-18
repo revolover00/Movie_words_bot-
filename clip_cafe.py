@@ -29,11 +29,17 @@ class PageParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.links = []
         self.meta = {}
+        self.audio_languages = {}
+        self.current_link = None
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         if tag == 'picture' and attrs.get('data-link'):
-            self.links.append(attrs['data-link'])
+            self.current_link = attrs['data-link']
+            self.links.append(self.current_link)
+        audio = attrs.get('aria-label', '')
+        if self.current_link and audio.startswith('Audio: '):
+            self.audio_languages[self.current_link] = {x.strip().casefold() for x in audio[7:].split(',')}
         if tag == 'meta' and attrs.get('property') and attrs.get('content'):
             self.meta[attrs['property']] = attrs['content']
 
@@ -89,10 +95,13 @@ def allowed(url: str) -> bool:
     return parsed.scheme == 'https' and parsed.hostname == 'clip.cafe'
 
 
-def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None) -> Clip:
+def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None) -> Clip:
     query = urlencode({'s': f'"{phrase}"', 'usersearch': '1', 'ss': 's'})
     result = page(BASE + '?' + query)
     for link in list(dict.fromkeys(result.links))[:15]:
+        available = result.audio_languages.get(link)
+        if audio_language and available and audio_language.casefold() not in available:
+            continue
         url = urljoin(BASE, link)
         if not allowed(url):
             continue
@@ -101,7 +110,7 @@ def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None) -> Cli
             quote = details.meta.get('og:description', '')
             title = details.meta.get('og:title', '')
             video_url = details.meta.get('og:video:secure_url') or details.meta.get('og:video', '')
-            if not matches(phrase, quote) or not allowed(video_url):
+            if (verify is None and not matches(phrase, quote)) or not allowed(video_url):
                 continue
             # Movie title appears after the separator in the page title.
             movie = title.rsplit('|', 1)[-1].strip().removesuffix(' scene').strip() or 'Film'
