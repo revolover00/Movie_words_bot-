@@ -95,13 +95,26 @@ def allowed(url: str) -> bool:
     return parsed.scheme == 'https' and parsed.hostname == 'clip.cafe'
 
 
+def search_links(phrase: str, audio_language: str | None):
+    """Prefer source language filters, then try unrestricted results.
+
+    Source metadata is not proof of the MP4's spoken language; callers must
+    verify audio before accepting multilingual clips.
+    """
+    base = {'s': f'"{phrase}"', 'usersearch': '1', 'ss': 's'}
+    queries = ([dict(base, audio=audio_language, sl=audio_language), base]
+               if audio_language else [base])
+    seen = set()
+    for query in queries:
+        result = page(BASE + '?' + urlencode(query))
+        for link in result.links[:15]:
+            if link not in seen:
+                seen.add(link)
+                yield link
+
+
 def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None) -> Clip:
-    params = {'s': f'"{phrase}"', 'usersearch': '1', 'ss': 's'}
-    if audio_language:
-        params.update(audio=audio_language, sl=audio_language)
-    query = urlencode(params)
-    result = page(BASE + '?' + query)
-    for link in list(dict.fromkeys(result.links))[:15]:
+    for link in search_links(phrase, audio_language):
         url = urljoin(BASE, link)
         if not allowed(url):
             continue
@@ -136,10 +149,16 @@ def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_
                 except Exception:
                     path.unlink(missing_ok=True)
                     raise
-            if verify is not None and not verify(path, phrase):
-                path.unlink(missing_ok=True)
-                log.info('Audio did not match the requested expression in clip %s', slug)
-                continue
+            if verify is not None:
+                try:
+                    verified = verify(path, phrase)
+                except Exception:
+                    path.unlink(missing_ok=True)
+                    raise
+                if not verified:
+                    path.unlink(missing_ok=True)
+                    log.info('Audio did not match the requested expression in clip %s', slug)
+                    continue
             log.info('Selected Clip.Cafe clip %s: %s', slug, movie)
             return Clip(slug, movie, quote, url, path)
         except (URLError, ValueError, OSError) as exc:
