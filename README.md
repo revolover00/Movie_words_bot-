@@ -97,7 +97,7 @@ For local testing you can still run `python bot.py` (polling) instead.
 
 ### 6. Run locally (optional)
 
-Install FFmpeg (including `ffprobe`) for the stream-language precheck.
+The `imageio-ffmpeg` dependency supplies FFmpeg when no system binary is available. A system `ffprobe`, if installed, is used for the stream-language precheck; otherwise the bundled FFmpeg inspects the stream.
 
 ```bash
 pip install -r requirements.txt

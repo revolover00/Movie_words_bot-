@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.error import URLError
 
 from preferences import validate_language
+from media_tools import ffmpeg_executable
 
 MAX_FILES = 30
 MAX_PLAYLIST = 100_000
@@ -97,7 +98,7 @@ def download_localized(slug: str, language: str, path: Path) -> bool:
                 (tmp / name).write_bytes(data)
             path.parent.mkdir(parents=True, exist_ok=True)
             result = subprocess.run([
-                'ffmpeg', '-nostdin', '-v', 'error', '-y',
+                ffmpeg_executable(), '-nostdin', '-v', 'error', '-y',
                 '-protocol_whitelist', 'file', '-i', str(tmp / 'video-lq.m3u8'),
                 '-protocol_whitelist', 'file', '-i', str(tmp / f'audio-{language}.m3u8'),
                 '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-movflags', '+faststart', str(path),
