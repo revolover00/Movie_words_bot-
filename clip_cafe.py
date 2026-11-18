@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
@@ -51,9 +52,21 @@ def page(url):
 
 def matches(phrase: str, quote: str) -> bool:
     """Require all expression words in order, ignoring punctuation and case."""
-    tokens = re.findall(r"[a-z0-9]+", phrase.lower())
-    words = re.findall(r"[a-z0-9]+", quote.lower())
-    return bool(tokens) and any(words[i:i + len(tokens)] == tokens for i in range(len(words)))
+    def normalize(text: str) -> str:
+        # Strip diacritics so equivalent subtitle spellings still match.
+        text = unicodedata.normalize('NFKD', text.casefold())
+        return ''.join(c for c in text if not unicodedata.combining(c))
+
+    tokens = re.findall(r'[^\W_]+', normalize(phrase), re.UNICODE)
+    words = re.findall(r'[^\W_]+', normalize(quote), re.UNICODE)
+    if not tokens:
+        return False
+    # CJK scripts commonly omit spaces between words; match the continuous
+    # sequence, but retain whole-word boundaries for other writing systems.
+    cjk = lambda word: any('\u3040' <= c <= '\u30ff' or '\u3400' <= c <= '\u9fff' for c in word)
+    if any(cjk(token) for token in tokens):
+        return ''.join(tokens) in ''.join(words)
+    return any(words[i:i + len(tokens)] == tokens for i in range(len(words)))
 
 
 def allowed(url: str) -> bool:

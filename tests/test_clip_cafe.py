@@ -7,6 +7,16 @@ def test_quote_requires_the_complete_phrase():
     assert matches('Take your time', 'Take your time!')
 
 
+def test_multilingual_matching_and_non_latin_text():
+    assert matches('Comment ça va', 'Bonjour ! Comment ça va ?')
+    assert matches('¿Cómo estás?', 'Hola, como estas?')
+    assert matches('كيف حالك', 'مرحبا، كيف حالك؟')
+    assert matches('你好', '你好朋友！')
+    assert matches('ありがとうございます', '本当にありがとうございます。')
+    assert not matches('привет', 'пока друг')
+    assert not matches('你好', '再见朋友')
+
+
 def test_parse_search_and_metadata():
     p = PageParser()
     p.feed('<picture data-link="movie/quote/"></picture><meta property="og:description" content="Nice &amp; easy"><meta property="og:video" content="https://clip.cafe/videos/a.mp4">')
