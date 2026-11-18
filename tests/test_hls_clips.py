@@ -12,7 +12,9 @@ def test_playlist_rejects_remote_and_encrypted_media():
     for bad in [good.replace('seg.m4s', 'https://evil.test/a'),
                 good.replace('seg.m4s', '../outside'),
                 good.replace('#EXTINF', '#EXT-X-KEY:METHOD=AES-128\n#EXTINF'),
-                good.replace('#EXT-X-ENDLIST', '')]:
+                good.replace('#EXT-X-ENDLIST', ''),
+                good.replace('#EXTINF', '#EXT-X-PART:URI="/etc/passwd"\n#EXTINF'),
+                good.replace('URI="init.mp4"', 'URI="../secret"')]:
         with pytest.raises(ValueError):
             hls_clips.playlist_files(bad)
 
@@ -29,7 +31,7 @@ def test_download_localized_uses_only_local_ffmpeg_inputs(monkeypatch, tmp_path)
         return b'part'
     monkeypatch.setattr(hls_clips, '_read', read)
     def ffmpeg(args, **kwargs):
-        assert 'file,crypto,data' in args
+        assert 'file' in args
         assert not any('https:' in part for part in args)
         (tmp_path / 'out.mp4').write_bytes(b'0000ftyp' + b'x' * 1100)
         return SimpleNamespace(returncode=0)

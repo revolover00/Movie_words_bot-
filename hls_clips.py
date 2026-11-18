@@ -35,12 +35,25 @@ def playlist_files(content: str) -> set[str]:
     if '#EXT-X-KEY' in content or '#EXT-X-SESSION-KEY' in content:
         raise ValueError('Encrypted stream is not supported')
     names = []
+    allowed_tags = {
+        '#EXTM3U', '#EXT-X-VERSION', '#EXT-X-TARGETDURATION',
+        '#EXT-X-MEDIA-SEQUENCE', '#EXT-X-PLAYLIST-TYPE',
+        '#EXT-X-INDEPENDENT-SEGMENTS', '#EXTINF', '#EXT-X-BYTERANGE',
+        '#EXT-X-ENDLIST', '#EXT-X-DISCONTINUITY',
+        '#EXT-X-DISCONTINUITY-SEQUENCE', '#EXT-X-PROGRAM-DATE-TIME',
+    }
     for line in content.splitlines():
         line = line.strip()
         if not line:
             continue
-        if line.startswith('#'):
-            names.extend(re.findall(r'URI="([^"]+)"', line))
+        if line.startswith('#EXT-X-MAP:'):
+            match = re.fullmatch(r'#EXT-X-MAP:URI="([^"]+)"(?:,BYTERANGE="[0-9]+(?:@[0-9]+)?")?', line)
+            if not match:
+                raise ValueError('Invalid HLS initialization asset')
+            names.append(match.group(1))
+        elif line.startswith('#'):
+            if line.split(':', 1)[0] not in allowed_tags or 'URI=' in line.upper():
+                raise ValueError('Unsupported HLS playlist directive')
         else:
             names.append(line)
     if not names or len(set(names)) > MAX_FILES:
@@ -85,8 +98,8 @@ def download_localized(slug: str, language: str, path: Path) -> bool:
             path.parent.mkdir(parents=True, exist_ok=True)
             result = subprocess.run([
                 'ffmpeg', '-nostdin', '-v', 'error', '-y',
-                '-protocol_whitelist', 'file,crypto,data', '-i', str(tmp / 'video-lq.m3u8'),
-                '-protocol_whitelist', 'file,crypto,data', '-i', str(tmp / f'audio-{language}.m3u8'),
+                '-protocol_whitelist', 'file', '-i', str(tmp / 'video-lq.m3u8'),
+                '-protocol_whitelist', 'file', '-i', str(tmp / f'audio-{language}.m3u8'),
                 '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-movflags', '+faststart', str(path),
             ], capture_output=True, timeout=60)
             if result.returncode or not path.is_file() or not 1024 <= path.stat().st_size <= MAX_BYTES:
