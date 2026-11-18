@@ -71,7 +71,7 @@ export default async function handler(req, res) {
         // Insert only for active subscribers, preserving all other preferences.
         const column = kind === 'learn' ? 'learning_language' : 'explanation_language';
         return client.query(`INSERT INTO subscriber_preferences (chat_id, ${column}, next_due_at)
-          SELECT chat_id, $1, now() + interval '3 hours' FROM subscribers WHERE chat_id = $2 AND is_active = TRUE
+          SELECT chat_id, $1, subscribed_at + interval '3 hours' FROM subscribers WHERE chat_id = $2 AND is_active = TRUE
           ON CONFLICT (chat_id) DO UPDATE SET ${column} = EXCLUDED.${column}, updated_at = now()
           RETURNING ${column}`, [value, chat.id]);
       });
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
       await sendMessage(chatId, kind === 'learn' ? 'اختار اللغة اللي عايز تتعلمها:' : 'اختار لغة الشرح:', languageKeyboard(kind));
     } else if (command === '/interval') {
       const result = await withDb(client => client.query(`INSERT INTO subscriber_preferences (chat_id, input_state, next_due_at)
-        SELECT chat_id, 'interval', now() + interval '3 hours' FROM subscribers WHERE chat_id = $1 AND is_active = TRUE
+        SELECT chat_id, 'interval', subscribed_at + interval '3 hours' FROM subscribers WHERE chat_id = $1 AND is_active = TRUE
         ON CONFLICT (chat_id) DO UPDATE SET input_state = 'interval' RETURNING chat_id`, [chatId]));
       await sendMessage(chatId, result.rowCount ? 'ابعت عدد الدقايق بين الرسائل، من ٥ لحد ١٤٤٠.' : 'اشترك الأول باستخدام /start');
     } else if (command === '/level') {
