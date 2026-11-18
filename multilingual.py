@@ -104,15 +104,11 @@ def likely_audio_language(path: Path, language: str) -> bool:
         return True
 
 
-def verify_audio(path: Path, expression: str, language: str) -> bool:
-    """Fail closed unless speech-to-text identifies the language and phrase.
-
-    Automatic transcription is imperfect; it is a best-effort check, not a
-    guarantee. A failure to access the API is not treated as a verified clip.
-    """
+def transcript_for_language(path: Path, language: str) -> str | None:
+    """Return a best-effort transcript only when the detected language matches."""
     validate_language(language)
     if not likely_audio_language(path, language):
-        return False
+        return None
     with path.open('rb') as video:
         transcript = client().audio.transcriptions.create(
             model='whisper-large-v3-turbo', file=video,
@@ -120,4 +116,10 @@ def verify_audio(path: Path, expression: str, language: str) -> bool:
         )
     detected = (getattr(transcript, 'language', '') or '').casefold()
     text = getattr(transcript, 'text', '') or ''
-    return detected in DETECTED_NAMES[language] and matches(expression, text)
+    return text if detected in DETECTED_NAMES[language] and text.strip() else None
+
+
+def verify_audio(path: Path, expression: str, language: str) -> bool:
+    """Best-effort speech-to-text verification of language and phrase."""
+    text = transcript_for_language(path, language)
+    return text is not None and matches(expression, text)
