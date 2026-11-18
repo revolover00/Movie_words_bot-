@@ -117,3 +117,20 @@ def test_localized_build_passes_correct_verifier_and_language(monkeypatch, tmp_p
         assert phrase.text in caption
         assert f'{lang}/ar/A2' in caption
         assert checked[-1][2] == lang
+
+
+def test_exhausted_english_bank_tries_new_generated_expressions(monkeypatch, tmp_path):
+    import multilingual
+    import clip_cafe
+    seen = {p.text.casefold() for p in phrases.BANK['A2']}
+    monkeypatch.setattr(daily_job.db, 'phrase_history', lambda *args: (seen, []))
+    monkeypatch.setattr(multilingual, 'expressions', lambda *args: [('A fresh sentence', 'new topic')])
+    monkeypatch.setattr(multilingual, 'meaning', lambda *args: 'meaning')
+    seen_queries = []
+    def find(text, **kwargs):
+        seen_queries.append(text)
+        return SimpleNamespace(path=tmp_path / 'clip', clip_id='id', title='Movie', url='https://clip.cafe/movie/')
+    monkeypatch.setattr(clip_cafe, 'find_clip', find)
+    result, _, _ = daily_job.build_localized_message('A2', 'en', 'ar')
+    assert result.text == 'A fresh sentence'
+    assert seen_queries == ['A fresh sentence']
