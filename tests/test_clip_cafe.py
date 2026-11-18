@@ -47,3 +47,18 @@ def test_search_includes_audio_and_transcript_language(monkeypatch, tmp_path):
         clip_cafe.find_clip('こんにちは', tmp_path, audio_language='ja')
     assert parse_qs(urlparse(urls[0]).query)['audio'] == ['ja']
     assert parse_qs(urlparse(urls[0]).query)['sl'] == ['ja']
+
+
+def test_search_falls_back_without_duplicate_clips(monkeypatch):
+    import clip_cafe
+    from urllib.parse import parse_qs, urlparse
+    calls = []
+    def search(url):
+        calls.append(parse_qs(urlparse(url).query))
+        p = PageParser()
+        p.links = ['a', 'b'] if len(calls) == 1 else ['b', 'c']
+        return p
+    monkeypatch.setattr(clip_cafe, 'page', search)
+    assert list(clip_cafe.search_links('hola', 'es')) == ['a', 'b', 'c']
+    assert calls[0]['audio'] == ['es']
+    assert 'audio' not in calls[1]
