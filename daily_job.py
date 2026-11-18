@@ -111,6 +111,9 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
             expression, clip, caption = build_localized_message(level, learning, explanation)
             sent_count = 0
             for sub in group:
+                if not db.still_due_with_settings(sub):
+                    log.info('Subscriber %s is no longer due with these settings', sub['chat_id'])
+                    continue
                 sent, failed = await broadcast(bot, [sub['chat_id']], str(clip.path), caption)
                 if sent:
                     sent_count += 1

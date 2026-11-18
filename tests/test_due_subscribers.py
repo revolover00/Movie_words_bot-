@@ -36,3 +36,13 @@ def test_advance_existing_subscriber_checks_version(monkeypatch):
     sql, params = cur.execute.call_args.args
     assert 'p.updated_at = %s' in sql
     assert params == (42, 'version')
+
+
+def test_preflight_checks_current_level_preferences_and_due_time(monkeypatch):
+    cur = mock_db(monkeypatch, row=(1,))
+    user = dict(chat_id=1, level='B1', learning_language='ja', explanation_language='ar', settings_updated_at='v')
+    assert db.still_due_with_settings(user)
+    sql, params = cur.execute.call_args.args
+    assert 's.is_active = TRUE' in sql and 's.level = %s' in sql
+    assert 'IS NOT DISTINCT FROM' in sql and '<= now()' in sql
+    assert params == (1, 'B1', 'ja', 'ar', 'v')
