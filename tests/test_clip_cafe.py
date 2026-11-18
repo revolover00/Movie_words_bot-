@@ -102,3 +102,12 @@ def test_redirect_policy_rejects_untrusted_destinations():
 def test_allowed_rejects_malformed_urls():
     assert not allowed('https://[bad-host/a')
     assert not allowed('https://clip.cafe:bad/a')
+
+
+def test_bounded_search_samples_beyond_top_results(monkeypatch):
+    import clip_cafe
+    p = PageParser()
+    p.links = [str(i) for i in range(20)]
+    monkeypatch.setattr(clip_cafe, 'page', lambda url: p)
+    monkeypatch.setattr(clip_cafe.random, 'sample', lambda population, k: population[-k:])
+    assert list(clip_cafe.search_links('hi', None, limit=6)) == ['0', '1', '2', '17', '18', '19']
