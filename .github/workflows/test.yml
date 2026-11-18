@@ -20,3 +20,10 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: node --test tests/telegram.test.js
+
+  inspect-player:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/maintenance/audio-probe'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/inspect_clip_player.py
