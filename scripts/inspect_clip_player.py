@@ -1,10 +1,11 @@
-"""Inspect public player metadata; no download or Telegram delivery."""
+"""Inspect public player implementation without delivering messages."""
 import re
 from urllib.request import Request, urlopen
-url='https://clip.cafe/incantation-2022/na-mei-guan-xi-xie-xie-chui-pao-pao-bu-cuo-a-mei-guan-xi-xie-xie/'
 headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'}
-with urlopen(Request(url, headers=headers), timeout=30) as f: html=f.read(2000000).decode('utf-8','replace')
 parts=[]
-for pattern in [r'<script[^>]+src=["\'][^"\']+["\'][^>]*>', r'.{0,100}m3u8.{0,180}', r'.{0,100}audioTracks.{0,180}',r'.{0,100}audio_tracks.{0,180}',r'.{0,100}hls.{0,180}',r'.{0,100}data-audio.{0,180}']:
-    parts.extend(re.findall(pattern,html,re.I)[:12])
-print('::notice title=Player metadata::'+' | '.join(parts).replace('%','%25').replace('\n',' '),flush=True)
+for path in ('js/player-ui.js','js/main_min.js'):
+    with urlopen(Request('https://clip.cafe/'+path, headers=headers), timeout=30) as f: text=f.read(2500000).decode('utf-8','replace')
+    for pat in (r'm3u8',r'audioTracks',r'\.m3u8',r'hlsUrl',r'hls_url',r'audioTrack'):
+        for m in list(re.finditer(pat,text,re.I))[:5]:
+            parts.append(path+':'+text[max(0,m.start()-150):m.end()+200])
+print('::notice title=Player implementation::'+' | '.join(parts).replace('%','%25').replace('\n',' ')[:60000],flush=True)
