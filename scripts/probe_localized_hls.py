@@ -25,4 +25,5 @@ with TemporaryDirectory() as out:
         text = getattr(transcript, 'text', '')
         print(f'::notice title=Localized audio {lang}::Detected={detected}; ffprobe={stream.stdout.strip()}; seed match={not phrase or multilingual.matches(phrase, text)}; transcript length={len(text)}', flush=True)
     except Exception as exc:
-        print(f'::warning title=Localized audio {lang} unavailable::{type(exc).__name__}: {str(exc)[:200]}', flush=True)
+        print(f'::error title=Localized audio {lang} unavailable::{type(exc).__name__}: {str(exc)[:200]}', flush=True)
+        raise SystemExit(1)

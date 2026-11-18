@@ -17,4 +17,5 @@ with TemporaryDirectory() as tmp, patch.object(daily_job.db, 'phrase_history', r
         assert phrase.text and clip.path.is_file() and len(caption) <= 1024
         print(f'::notice title=Pipeline {lang}::{level} verified audio and explanation generated, no delivery', flush=True)
     except Exception as exc:
-        print(f'::warning title=Pipeline {lang} unavailable::{type(exc).__name__}', flush=True)
+        print(f'::error title=Pipeline {lang} unavailable::{type(exc).__name__}', flush=True)
+        raise SystemExit(1)
