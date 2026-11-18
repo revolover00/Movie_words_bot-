@@ -21,15 +21,22 @@ jobs:
       - run: npm ci
       - run: node --test tests/telegram.test.js
 
-  database-probe:
+  live-probe:
     if: github.event_name == 'push' && github.ref == 'refs/heads/arena/e5deedb5-movie-words-bot'
     runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      max-parallel: 2
+      fail-fast: false
+      matrix:
+        language: [ar, ru, hi, ja, zh]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - run: pip install -r requirements.txt
-      - run: python scripts/probe_database_temp.py
+      - run: python scripts/probe_multilingual_live.py ${{ matrix.language }}
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
