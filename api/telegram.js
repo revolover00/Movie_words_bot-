@@ -11,7 +11,7 @@ const LANGUAGES = [
 const CODES = new Set(LANGUAGES.map(([code]) => code));
 const languageKeyboard = (kind) => ({ inline_keyboard: Array.from({ length: 5 }, (_, row) =>
   LANGUAGES.slice(row * 2, row * 2 + 2).map(([code, label]) => ({ text: label, callback_data: `${kind}:${code}` }))) });
-const WELCOME = 'أهلاً بيك 🎬\nهيوصلك تعبير إنجليزي مع معناه بالمصري ومقطع من فيلم حسب مستواك.\n\nاختار مستواك من الأزرار، وتقدر تغيّره في أي وقت بـ /level.\n/today — آخر تعبير لمستواك\n/stop — إلغاء الاشتراك';
+const WELCOME = 'أهلاً بيك 🎬\nهيوصلك تعبير ومقطع من فيلم حسب مستواك وإعداداتك.\n\nاختار مستواك من الأزرار، وتقدر تغيّره بـ /level.\n/learn — لغة التعلّم\n/explain — لغة الشرح\n/interval — الوقت بين الرسائل (من ٥ لـ ١٤٤٠ دقيقة)\n/today — آخر تعبير لمستواك\n/stop — إلغاء الاشتراك';
 const KEYBOARD = { inline_keyboard: [LEVELS.map(level => ({ text: level, callback_data: `level:${level}` }))] };
 
 async function withDb(fn) {
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
         ? `🎬 آخر تعبير لمستوى ${row.level}: ${row.phrase}\n🎞️ من: ${row.video_title || '—'}`
         : `لسه مفيش تعبير اتبعت لمستوى ${row.level} ⏳`);
     } else if (command === '/help') {
-      await sendMessage(chatId, WELCOME + '\n/learn — لغة التعلّم\n/explain — لغة الشرح\n/interval — المدة بين الرسائل', true);
+      await sendMessage(chatId, WELCOME, true);
     } else if (message.text && !command.startsWith('/')) {
       const input = message.text.trim().replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x6f0));
       const result = await withDb(async client => {
@@ -135,6 +135,7 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error('webhook error', err);
+    return res.status(500).send('temporary error');
   }
   return res.status(200).send('ok');
 }

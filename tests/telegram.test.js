@@ -65,3 +65,11 @@ test('interval accepts Arabic numerals and rejects values outside bounds', async
   assert.deepEqual(saved.values, [6, 1]);
   inputState = null;
 });
+
+test('welcome explains language and interval controls', async () => {
+  calls.length = 0;
+  await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, from: { id: 1 }, text: '/start' } } }, res());
+  assert.match(calls.at(-1).body.text, /\/learn/);
+  assert.match(calls.at(-1).body.text, /\/explain/);
+  assert.match(calls.at(-1).body.text, /\/interval/);
+});
