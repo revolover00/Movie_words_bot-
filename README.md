@@ -33,7 +33,7 @@ New users subscribe via `/start` (handled by `bot.py` with long polling).
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
 | yt-dlp + FFmpeg | YouTube download + clip cutting |
-| Groq API (`llama-3.1-8b-instant`) | Word meanings |
+| Groq API (`qwen/qwen3.8-27b`) | Word meanings |
 
 ## Setup
 
@@ -124,7 +124,7 @@ The PAT needs `repo` scope (classic) or repository Contents read and write permi
 | `BOT_TOKEN` | ✅ | — | Telegram bot token |
 | `DATABASE_URL` | ✅ | — | Neon Postgres connection string |
 | `GROQ_API_KEY` | ✅ | — | Groq API key |
-| `GROQ_MODEL` | | `llama-3.1-8b-instant` | Groq model |
+| `GROQ_MODEL` | | `qwen/qwen3.8-27b` | Groq model |
 | `WORDS_FILE` | | `words.txt` | Word bank (one word per line) |
 | `CLIP_BEFORE` | | `2` | Seconds before the word |
 | `CLIP_AFTER` | | `3` | Seconds after the word |
