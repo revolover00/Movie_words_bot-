@@ -166,7 +166,7 @@ node --test tests/telegram.test.js
 ## Notes
 
 - Clip.Cafe integration parses public web pages, which may change or become unavailable.
-- English expressions use a finite curated bank; other learning languages use generated candidates. Clips are only sent after best-effort audio verification. Some language/level combinations may have no usable clip.
+- English expressions use a curated bank, with generated candidates after it is exhausted; other learning languages use generated candidates. Clips are only sent after best-effort audio verification. Some language/level combinations may have no usable clip.
 - Serialized Actions runs and a pre-send settings check reduce races, but Telegram sends and database updates cannot be atomic. Long-running jobs can delay individual schedules; provider free tiers impose usage limits.
 - Clips are short excerpts from Clip.Cafe for educational use.
 
