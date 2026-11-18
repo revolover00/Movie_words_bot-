@@ -51,6 +51,7 @@ test('language selection records the requested language', async () => {
   await handler({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { chat: { id: 1, type: 'private' } }, data: 'learn:es' } } }, res());
   const query = queries.find(q => q.sql.includes('INSERT INTO subscriber_preferences') && q.sql.includes('learning_language'));
   assert.deepEqual(query.values, ['es', 1]);
+  assert.match(query.sql, /subscribed_at \+ interval '3 hours'/);
   assert.match(calls.at(-1).body.text, /es/);
 });
 
@@ -72,4 +73,12 @@ test('welcome explains language and interval controls', async () => {
   assert.match(calls.at(-1).body.text, /\/learn/);
   assert.match(calls.at(-1).body.text, /\/explain/);
   assert.match(calls.at(-1).body.text, /\/interval/);
+});
+
+
+test('opening interval input preserves a new preferences row due time', async () => {
+  queries.length = 0; calls.length = 0;
+  await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, from: { id: 1 }, text: '/interval' } } }, res());
+  const query = queries.find(q => q.sql.includes("'interval'") && q.sql.includes('INSERT INTO subscriber_preferences'));
+  assert.match(query.sql, /subscribed_at \+ interval '3 hours'/);
 });
