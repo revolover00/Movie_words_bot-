@@ -162,10 +162,11 @@ def due_subscribers() -> list[dict]:
 
 
 def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:
-    """Advance only if preferences haven't changed during delivery.
+    """Advance after a successful send without clobbering a newer schedule.
 
-    New preference rows use the old three-hour default. Existing rows are
-    guarded by updated_at, so a concurrent settings change is not overwritten.
+    If settings changed during delivery, preserve a future due time set by the
+    user. If the new schedule is still overdue, advance using its current
+    interval to avoid an immediate duplicate on the next scheduler tick.
     """
     with connect() as conn, conn.cursor() as cur:
         if settings_updated_at is None:
@@ -185,6 +186,16 @@ def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:
                   AND p.updated_at = %s
                 RETURNING p.chat_id
             """, (chat_id, settings_updated_at))
+        if cur.fetchone() is not None:
+            return True
+        cur.execute("""
+            UPDATE subscriber_preferences p
+            SET next_due_at = now() + p.interval_minutes * interval '1 minute'
+            FROM subscribers s
+            WHERE p.chat_id = %s AND s.chat_id = p.chat_id AND s.is_active = TRUE
+              AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()
+            RETURNING p.chat_id
+        """, (chat_id,))
         return cur.fetchone() is not None
 
 
