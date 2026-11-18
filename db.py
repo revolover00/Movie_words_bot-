@@ -186,3 +186,23 @@ def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:
                 RETURNING p.chat_id
             """, (chat_id, settings_updated_at))
         return cur.fetchone() is not None
+
+
+def still_due_with_settings(subscriber: dict) -> bool:
+    """Recheck activity, level, preferences and due time just before sending.
+
+    This narrows races with /stop and settings changes. Telegram and Postgres
+    cannot share a transaction, so it cannot eliminate all delivery races.
+    """
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("""
+            SELECT 1 FROM subscribers s
+            LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
+            WHERE s.chat_id = %s AND s.is_active = TRUE AND s.level = %s
+              AND COALESCE(p.learning_language, 'en') = %s
+              AND COALESCE(p.explanation_language, 'ar') = %s
+              AND p.updated_at IS NOT DISTINCT FROM %s
+              AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()
+        """, (subscriber['chat_id'], subscriber['level'], subscriber['learning_language'],
+              subscriber['explanation_language'], subscriber['settings_updated_at']))
+        return cur.fetchone() is not None
