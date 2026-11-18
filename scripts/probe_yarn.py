@@ -7,8 +7,8 @@ from clip_cafe import find_clip, matches
 
 EXAMPLES = {
     'en': 'Nice to meet you', 'es': 'muchas gracias', 'fr': 'je suis désolé',
-    'ar': 'شكرا جزيلا', 'pt': 'muito obrigado', 'de': 'vielen dank',
-    'ru': 'большое спасибо', 'hi': 'बहुत धन्यवाद', 'ja': 'ありがとう', 'zh': '谢谢',
+    'ar': 'مرحبا', 'pt': 'muito obrigado', 'de': 'vielen dank',
+    'ru': 'спасибо', 'hi': 'नमस्ते', 'ja': 'こんにちは', 'zh': '谢谢',
 }
 with TemporaryDirectory() as directory:
     for lang, expression in EXAMPLES.items():
