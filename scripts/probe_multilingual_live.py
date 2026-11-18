@@ -11,16 +11,19 @@ examples = {
     'ar': 'مرحبا', 'pt': 'muito obrigado', 'de': 'vielen dank',
     'ru': 'спасибо', 'hi': 'नमस्ते', 'ja': 'こんにちは', 'zh': '谢谢',
 }
+results = []
 with TemporaryDirectory() as out:
     for lang, phrase in examples.items():
         try:
             options = expressions(lang, 'A2', set(), [])
             text = meaning(phrase, lang, 'ar', 'A2')
-            print(f'::notice title=Generation {lang}::Generated {len(options)} candidates and explanation ({len(text)} characters)', flush=True)
+            results.append(f'{lang}:text=ok')
         except Exception as exc:
-            print(f'::warning title=Generation {lang} unavailable::{type(exc).__name__}', flush=True)
+            results.append(f'{lang}:text={type(exc).__name__}')
         try:
             clip = find_clip(phrase, Path(out), verify=lambda path, text: verify_audio(path, text, lang))
-            print(f'::notice title=Audio {lang}::Verified clip {clip.clip_id}', flush=True)
+            results.append(f'{lang}:audio=ok')
         except Exception as exc:
-            print(f'::warning title=Audio {lang} unavailable::{type(exc).__name__}', flush=True)
+            results.append(f'{lang}:audio={type(exc).__name__}')
+
+print('::notice title=Multilingual probe::' + '; '.join(results), flush=True)
