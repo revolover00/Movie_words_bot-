@@ -70,9 +70,11 @@ async def send_video(bot, chat_id, video, caption, markup, sleep=asyncio.sleep):
     raise AssertionError('Unreachable')
 
 
-async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepared_lookup=None):
+async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepared_lookup=None, shared_queue=False):
     stats = stats or Stats()
     groups = defaultdict(list)
+    if shared_queue:
+        subscribers = store.assign_cached(subscribers)
     for sub in subscribers:
         if not db.still_due_with_settings(sub):
             stats.skipped += 1
@@ -97,7 +99,7 @@ async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepar
                 stats.skipped += 1
                 continue
         # Retrying an explicitly refused send must use its original lesson.
-        pinned = previous['content_id'] if previous else (prepared_lookup(sub) if prepared_lookup else None)
+        pinned = previous['content_id'] if previous else ((prepared_lookup(sub) if prepared_lookup else None) or sub.get('queue_content_id'))
         key = (sub['level'], sub['learning_language'], pinned)
         groups[key].append(sub)
     for (level, learning, pinned), audience in groups.items():

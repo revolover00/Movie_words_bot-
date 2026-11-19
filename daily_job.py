@@ -219,7 +219,7 @@ def main() -> None:
                 def restore_clip(content):
                     return media.enter_context(preparation.restore(content, reload_clip))
                 asyncio.run(run(subscribers, Bot(token=config.bot_token), select_localized_clip,
-                                localized_caption, restore_clip, stats, prepared_lookup=preparation.ready))
+                                localized_caption, restore_clip, stats, prepared_lookup=preparation.ready, shared_queue=True))
             prepared, failed = preparation.prepare(db.due_subscribers(10), select_localized_clip, localized_caption)
             log.info('Lookahead: %s slots prepared, %s failed', prepared, failed)
             status = 'failed' if stats.failed or stats.uncertain or failed else 'completed'

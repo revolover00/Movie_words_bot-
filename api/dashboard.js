@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return res.status(401).send('Private dashboard. Sign in as admin.');
   }
   if (req.query?.data === '1') {
-    try { return res.status(200).json(await snapshot()); }
+    try { return res.status(200).json(await snapshot({page:req.query?.page,search:req.query?.search})); }
     catch { return res.status(503).json({ error: 'تعذر تحميل البيانات. حاول تاني بعد شوية.' }); }
   }
   const html = readFileSync(new URL('../dashboard.html', import.meta.url), 'utf8');
