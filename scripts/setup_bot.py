@@ -8,10 +8,13 @@ import requests
 import db
 from config import config
 from bot_identity import database_schema
+from scripts.bot_profile import configure_profile
 
 
 def main():
-    config.validate('bot_token', 'database_url')
+    config.validate('bot_token')
+    if os.environ.get('PROFILE_ONLY', '').lower() != 'true':
+        config.validate('database_url')
     base = f'https://api.telegram.org/bot{config.bot_token}'
     # Never log request URLs: Telegram embeds the credential in the path.
     def api(method, **payload):
@@ -30,19 +33,10 @@ def main():
     expected = os.environ.get('EXPECTED_BOT_ID', '')
     if not expected or str(identity['id']) != expected:
         raise RuntimeError('GitHub BOT_TOKEN does not match the requested new bot; update the secret first')
-    api('setMyName', name='SceneLingo')
-    api('setMyDescription', description='Learn real expressions from movie scenes, at your pace. Choose your learning language, explanation language, level and message frequency. Save expressions and practise recall with /review.')
-    api('setMyShortDescription', short_description='SceneLingo · Learn languages, one scene at a time. 🎬')
-    commands = [
-        ('start','Set up subscription','إعداد الاشتراك'), ('language','Bot language','لغة البوت'),
-        ('learn','Learning language','لغة التعلّم'), ('level','Learning level','المستوى'),
-        ('explain','Explanation language','لغة الشرح'), ('interval','Message frequency','مواعيد الرسائل'),
-        ('saved','Saved expressions','التعبيرات المحفوظة'), ('review','Review an expression','مراجعة تعبير'),
-        ('today','Latest expression','آخر تعبير'), ('help','Help and commands','المساعدة'),
-        ('stop','Pause subscription','إيقاف الاشتراك'),
-    ]
-    api('setMyCommands', commands=[dict(command=cmd,description=en) for cmd,en,ar in commands])
-    api('setMyCommands', language_code='ar', commands=[dict(command=cmd,description=ar) for cmd,en,ar in commands])
+    configure_profile(api)
+    if os.environ.get('PROFILE_ONLY', '').lower() == 'true':
+        print('::notice title=Bot profile::Name, descriptions, commands and menu applied and verified; webhook unchanged', flush=True)
+        return
     db.init_db()
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute('SELECT count(*), count(*) FILTER (WHERE is_active) FROM subscribers')
