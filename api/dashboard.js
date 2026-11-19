@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return res.status(405).send('Method not allowed'); }
   if (!process.env.DASHBOARD_PASSWORD_HASH) return res.status(503).send('Dashboard access is not configured');
   if (!authorized(req.headers.authorization, process.env.DASHBOARD_PASSWORD_HASH)) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="SceneLingoo admin", charset="UTF-8"');
+    res.setHeader('WWW-Authenticate', 'Basic realm="SceneLingo admin", charset="UTF-8"');
     return res.status(401).send('Private dashboard. Sign in as admin.');
   }
   if (req.query?.data === '1') {

@@ -17,6 +17,8 @@ from lessons import caption as render_caption
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
 
 
 def build_message(level: str):
@@ -183,22 +185,41 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
         raise RuntimeError(f'Failed to deliver {len(failures)} group(s) or subscriber(s)')
 
 def main() -> None:
+    import delivery_store
+    from reliable_delivery import run, Stats
+
     config.validate('database_url', 'bot_token')
     db.init_db()
-    subscribers = db.due_subscribers()
-    if not subscribers:
-        db.record_delivery_run('idle', 0)
-        log.info('No subscribers due; no messages sent')
-        print('::notice title=Delivery::No subscribers due', flush=True)
-        return
-    config.validate('groq_api_key')
-    try:
-        asyncio.run(run_due_subscribers(subscribers))
-    except Exception:
-        db.record_delivery_run('failed', len(subscribers))
-        raise
-    else:
-        db.record_delivery_run('completed', len(subscribers))
+    with delivery_store.worker_lock() as acquired:
+        if not acquired:
+            log.info('Another delivery worker owns this bot; skipping')
+            return
+        subscribers = db.due_subscribers()
+        if not subscribers:
+            db.record_delivery_run('idle', 0)
+            log.info('No subscribers due; no content generated')
+            return
+        stats = Stats()
+        started = time.monotonic()
+        status = 'failed'
+
+        def reload_clip(content):
+            return clip_cafe.find_clip(content['phrase'], audio_language=content['learning_language'],
+                verify=lambda path, phrase: multilingual.verify_audio(path, phrase, content['learning_language']))
+
+        try:
+            asyncio.run(run(subscribers, Bot(token=config.bot_token), select_localized_clip,
+                            localized_caption, reload_clip, stats))
+            status = 'failed' if stats.failed or stats.uncertain else 'completed'
+        finally:
+            try:
+                delivery_store.record_run(status, len(subscribers), stats.dict(), time.monotonic() - started)
+            except Exception:
+                log.warning('Run summary persistence unavailable; consult slot ledger')
+                status = 'failed'
+            print(f'::notice title=SceneLingo delivery::{stats.dict()}', flush=True)
+        if status == 'failed':
+            raise RuntimeError('Delivery had failed or uncertain outcomes; inspect the private dashboard')
 
 
 if __name__ == '__main__':

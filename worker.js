@@ -1,4 +1,4 @@
-// Movie Word Bot — Cloudflare Worker (free 24/7 webhook for /start, /stop, /help)
+// SceneLingo — Cloudflare Worker (free 24/7 webhook for /start, /stop, /help)
 // Deploy: npm i -g wrangler && wrangler login && wrangler deploy
 // Secrets: wrangler secret put BOT_TOKEN / DATABASE_URL
 // Then set the webhook: curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WORKER_URL>"
@@ -23,7 +23,7 @@ async function sendMessage(token, chatId, text) {
 export default {
   async fetch(request, env) {
     if (request.method !== "POST") {
-      return new Response("Movie Word Bot webhook", { status: 200 });
+      return new Response("SceneLingo webhook", { status: 200 });
     }
     const update = await request.json().catch(() => ({}));
     const message = update.message || {};

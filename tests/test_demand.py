@@ -58,6 +58,9 @@ def test_settings_change_after_content_search_skips_explanation(monkeypatch):
 
 
 def test_idle_scheduler_does_not_require_ai_credentials(monkeypatch):
+    import delivery_store
+    from contextlib import nullcontext
+    monkeypatch.setattr(delivery_store, 'worker_lock', lambda: nullcontext(True))
     validated = []
     monkeypatch.setattr(daily_job, 'config', SimpleNamespace(validate=lambda *names: validated.append(names)))
     monkeypatch.setattr(daily_job.db, 'init_db', lambda: None)
