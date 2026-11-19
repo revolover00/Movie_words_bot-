@@ -64,7 +64,9 @@ def test_idle_scheduler_does_not_require_ai_credentials(monkeypatch):
     validated = []
     monkeypatch.setattr(daily_job, 'config', SimpleNamespace(validate=lambda *names: validated.append(names)))
     monkeypatch.setattr(daily_job.db, 'init_db', lambda: None)
-    monkeypatch.setattr(daily_job.db, 'due_subscribers', lambda: [])
+    import preparation
+    monkeypatch.setattr(preparation, 'cleanup', lambda: None)
+    monkeypatch.setattr(daily_job.db, 'due_subscribers', lambda *args: [])
     record = Mock()
     monkeypatch.setattr(daily_job.db, 'record_delivery_run', record)
     run = Mock()

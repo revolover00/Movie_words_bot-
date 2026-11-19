@@ -49,7 +49,7 @@ def test_preflight_checks_current_level_preferences_and_due_time(monkeypatch):
     assert 's.is_active = TRUE' in sql and 's.level = %s' in sql
     assert "LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'" in sql
     assert 'IS NOT DISTINCT FROM' in sql and '<= now()' in sql
-    assert params == (1, 'B1', 'ja', 'ar', 'v')
+    assert params == (1, 'B1', 'ja', 'ar', 'v', 0)
 
 
 def test_advance_changed_settings_only_when_current_schedule_is_overdue(monkeypatch):
@@ -60,3 +60,12 @@ def test_advance_changed_settings_only_when_current_schedule_is_overdue(monkeypa
     assert 'p.updated_at = %s' in first
     assert "next_delivery_at(p.interval_minutes)" in fallback
     assert "<= now()" in fallback
+
+
+def test_lookahead_is_parameterized_and_preflight_uses_same_horizon(monkeypatch):
+    cur = mock_db(monkeypatch, row=(1,))
+    db.due_subscribers(10)
+    assert cur.execute.call_args.args[1] == (10,)
+    user = dict(chat_id=1, level='B1', learning_language='ja', explanation_language='ar', settings_updated_at='v')
+    assert db.still_due_with_settings(user, 10)
+    assert cur.execute.call_args.args[1][-1] == 10
