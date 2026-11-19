@@ -1,5 +1,9 @@
 # SceneLingo 🎬
 
+**المشروع الأصلي من [revolover00](https://github.com/revolover00) · Copyright (c) 2026 revolover00.**
+**Original project:** [revolover00/scenelingo](https://github.com/revolover00/scenelingo).
+الكود متاح بترخيص MIT مع وجوب الاحتفاظ بإشعار الحقوق والترخيص وفق شروطه؛ النسخ المستقلة ليست إصدارات رسمية من صاحب المشروع. [الملكية والنسب / Ownership and attribution](OWNERSHIP.md).
+
 A free, open-source Telegram bot for useful expressions with matching short movie clips and explanations. Subscribers choose a CEFR level, learning language, explanation language and delivery interval inside Telegram.
 
 > Learn languages by watching movies — expressions for your level, zero self-hosting.
@@ -172,7 +176,14 @@ node --test tests/telegram.test.js
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Copyright (c) 2026 **revolover00**. Licensed under [MIT](LICENSE).
+Redistributions of copies or substantial portions must retain the copyright and
+permission notices as specified in that license. MIT permits reuse, modification
+and commercial use; it does not make independent forks official releases.
+See [ownership, attribution and third-party rights](OWNERSHIP.md) for details.
+
+حقوق مشاهد الأفلام والمحتوى الخارجي لأصحابها، ولا يشملها ترخيص كود المشروع.
+لا يُفهم من هذا الإشعار أن اسم SceneLingo علامة تجارية مسجلة.
 
 ### Starting with a different Telegram bot
 
