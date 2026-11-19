@@ -129,6 +129,10 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
 
     Clips must pass audio verification before delivery.
     """
+    # Recheck before content search, not just before sending.
+    subscribers = [sub for sub in subscribers if db.still_due_with_settings(sub)]
+    if not subscribers:
+        return
     bot = Bot(token=config.bot_token)
     groups: dict[tuple[str, str], dict[str, list[dict]]] = {}
     for sub in subscribers:
@@ -136,6 +140,11 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
         groups.setdefault(key, {}).setdefault(sub['explanation_language'], []).append(sub)
     failures = []
     for (level, learning), explanations in groups.items():
+        explanations = {language: [sub for sub in group if db.still_due_with_settings(sub)]
+                        for language, group in explanations.items()}
+        explanations = {language: group for language, group in explanations.items() if group}
+        if not explanations:
+            continue
         try:
             expression, clip = select_localized_clip(level, learning)
         except Exception:
@@ -144,6 +153,9 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
             continue
         sent_count = 0
         for explanation, group in explanations.items():
+            group = [sub for sub in group if db.still_due_with_settings(sub)]
+            if not group:
+                continue
             try:
                 caption = localized_caption(expression.text, clip, level, learning, explanation)
             except Exception:
@@ -176,14 +188,22 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
         raise RuntimeError(f'Failed to deliver {len(failures)} group(s) or subscriber(s)')
 
 def main() -> None:
-    config.validate('database_url', 'bot_token', 'groq_api_key')
+    config.validate('database_url', 'bot_token')
     db.init_db()
     subscribers = db.due_subscribers()
     if not subscribers:
+        db.record_delivery_run('idle', 0)
         log.info('No subscribers due; no messages sent')
         print('::notice title=Delivery::No subscribers due', flush=True)
         return
-    asyncio.run(run_due_subscribers(subscribers))
+    config.validate('groq_api_key')
+    try:
+        asyncio.run(run_due_subscribers(subscribers))
+    except Exception:
+        db.record_delivery_run('failed', len(subscribers))
+        raise
+    else:
+        db.record_delivery_run('completed', len(subscribers))
 
 
 if __name__ == '__main__':

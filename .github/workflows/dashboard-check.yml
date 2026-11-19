@@ -1,0 +1,19 @@
+name: Dashboard production smoke
+on:
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Verify private dashboard in browser
+        env:
+          DASHBOARD_SMOKE_PASSWORD: ${{ secrets.DASHBOARD_SMOKE_PASSWORD }}
+        run: node scripts/check_dashboard.mjs

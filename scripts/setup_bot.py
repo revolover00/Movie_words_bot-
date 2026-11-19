@@ -34,7 +34,7 @@ def main():
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute('SELECT count(*), count(*) FILTER (WHERE is_active) FROM subscribers')
         total, active = cur.fetchone()
-    url = 'https://movie-word-bot.vercel.app/api/telegram'
+    url = os.environ.get('WEBHOOK_URL', 'https://scenelingoo.vercel.app/api/telegram')
     api('setWebhook', url=url, allowed_updates=['message', 'callback_query'])
     info = api('getWebhookInfo')
     if info.get('url') != url:
