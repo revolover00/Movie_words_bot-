@@ -159,8 +159,8 @@ def mark_phrase_sent(level: str, phrase: str, topic: str, clip_id: str, title: s
         )
 
 
-def due_subscribers() -> list[dict]:
-    """List active users due at the current database time, with their preferences.
+def due_subscribers(lookahead_minutes: int = 0) -> list[dict]:
+    """List active users due now or within the optional lookahead window.
 
     This is a scheduling building block, not a delivery claim. The caller must
     serialize scheduling runs and advance a user's due time only after delivery.
@@ -179,9 +179,9 @@ def due_subscribers() -> list[dict]:
                 LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
                 WHERE s.is_active = TRUE
                   AND COALESCE(p.input_state, '') NOT LIKE 'setup_%'
-                  AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()
+                  AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now() + %s * interval '1 minute'
                 ORDER BY COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours'), s.chat_id
-            """)
+            """, (lookahead_minutes,))
             return [dict(row) for row in cur.fetchall()]
 
 
@@ -223,7 +223,7 @@ def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:
         return cur.fetchone() is not None
 
 
-def still_due_with_settings(subscriber: dict) -> bool:
+def still_due_with_settings(subscriber: dict, lookahead_minutes: int = 0) -> bool:
     """Recheck activity, level, preferences and due time just before sending.
 
     This narrows races with /stop and settings changes. Telegram and Postgres
@@ -238,9 +238,9 @@ def still_due_with_settings(subscriber: dict) -> bool:
               AND COALESCE(p.explanation_language, 'ar') = %s
               AND LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'
               AND p.updated_at IS NOT DISTINCT FROM %s
-              AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()
+              AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now() + %s * interval '1 minute'
         """, (subscriber['chat_id'], subscriber['level'], subscriber['learning_language'],
-              subscriber['explanation_language'], subscriber['settings_updated_at']))
+              subscriber['explanation_language'], subscriber['settings_updated_at'], lookahead_minutes))
         return cur.fetchone() is not None
 
 

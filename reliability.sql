@@ -62,3 +62,19 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     duration_seconds DOUBLE PRECISION NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Small, short-lived verified media buffer shared by every recipient of a lesson.
+-- No binary media is committed to the repository or Actions artifacts.
+CREATE TABLE IF NOT EXISTS prepared_media (
+    content_id BIGINT PRIMARY KEY REFERENCES lesson_content(id) ON DELETE CASCADE,
+    payload BYTEA NOT NULL CHECK (octet_length(payload) <= 20971520),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT now()+interval '24 hours'
+);
+CREATE TABLE IF NOT EXISTS prepared_slots (
+    chat_id BIGINT NOT NULL REFERENCES subscribers(chat_id) ON DELETE CASCADE,
+    due_at TIMESTAMPTZ NOT NULL,
+    settings_updated_at TIMESTAMPTZ,
+    content_id BIGINT NOT NULL REFERENCES lesson_content(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY(chat_id,due_at)
+);

@@ -9,7 +9,7 @@ A free, open-source Telegram bot for useful expressions with matching short movi
 ## How it works
 
 ```
-cron-job.org (at :00 and :30)
+cron-job.org (every 10 minutes)
     │  POST → GitHub API (repository_dispatch)
     ▼
 GitHub Actions (free ephemeral runner)
@@ -31,7 +31,7 @@ Use `/start` for guided setup: bot interface language (Arabic or English) → le
 
 | Tool | Role |
 | --- | --- |
-| cron-job.org | Every 2 minutes (HTTP POST) |
+| cron-job.org | External HTTP POST every 10 minutes |
 | GitHub Actions | Free ephemeral worker |
 | Python + python-telegram-bot | The bot |
 | Neon (Postgres) | Database |
@@ -285,3 +285,39 @@ send to opted-in recipients only. Monitor uncertain receipts and content failure
 never bulk-reset claims to force retries. Historical commit messages on shared
 branches have not been rewritten. Copyright permissions and human review of
 content remain operator responsibilities.
+
+
+## Ten-minute preparation window
+
+Keep the external cron at **every 10 minutes**. Each serialized worker run sends
+currently due lessons first, then prepares lessons due within the next 10 minutes.
+Preparation checks the current subscription and settings, reuses verified content
+and explanations where possible, and never sends Telegram messages or advances a
+schedule. A partial media assignment survives explanation failure, allowing the
+next tick to retry the missing explanation rather than select another clip.
+
+Prepared slots are keyed by recipient and exact due time, with a settings version.
+Delivery only uses a matching, ready assignment and rechecks eligibility before
+sending. Stopped or changed subscriptions cannot bypass the normal preflight.
+Missing/expired preparations use the existing verified on-demand pipeline, so a
+new subscription or missed preparation tick does not permanently block delivery.
+Existing delivery claims and uncertainty rules still apply.
+
+For this small deployment, verified clip bytes use a **temporary Postgres buffer**,
+shared by lesson, not per user: at most **20 MiB per clip and 80 MiB total**, with a
+24-hour expiry. Cleanup runs on each worker invocation and removes expired media
+and media already reusable via Telegram file ID. Old slot assignments are cleaned
+after their due time plus 24 hours. These are application limits, NOT reserved
+provider capacity: database quotas, backups, WAL and network overhead still apply.
+No new storage credentials, public clip URLs or binary files in Git are needed.
+Larger clips or a full buffer fail preparation visibly and retain the existing
+on-demand delivery fallback. At larger scale migrate this buffer to object storage.
+
+Logs report prepared slots and preparation failures; failures cause a failed run
+and are retried on later ticks. The dashboard's delivery counts are NOT counts of
+prepared slots. No early upload to an admin/staging Telegram chat is performed.
+
+**Timing limits:** this is lookahead preparation, not a real-time scheduler.
+GitHub runner startup/queues can delay both phases; a due time between cron ticks
+can wait until the next tick. Overlapping invocations share the existing workflow
+concurrency group and database lock. Do not promise second-accurate delivery.

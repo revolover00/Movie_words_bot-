@@ -186,6 +186,8 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
 
 def main() -> None:
     import delivery_store
+    import preparation
+    from contextlib import ExitStack
     from reliable_delivery import run, Stats
 
     config.validate('database_url', 'bot_token')
@@ -194,10 +196,14 @@ def main() -> None:
         if not acquired:
             log.info('Another delivery worker owns this bot; skipping')
             return
+        preparation.cleanup()
         subscribers = db.due_subscribers()
         if not subscribers:
-            db.record_delivery_run('idle', 0)
-            log.info('No subscribers due; no content generated')
+            prepared, failed = preparation.prepare(db.due_subscribers(10), select_localized_clip, localized_caption)
+            db.record_delivery_run('failed' if failed else ('completed' if prepared else 'idle'), 0)
+            log.info('Lookahead: %s slots prepared, %s failed', prepared, failed)
+            if failed:
+                raise RuntimeError('Lookahead preparation failed; will retry next tick')
             return
         stats = Stats()
         started = time.monotonic()
@@ -208,9 +214,15 @@ def main() -> None:
                 verify=lambda path, phrase: multilingual.verify_audio(path, phrase, content['learning_language']))
 
         try:
-            asyncio.run(run(subscribers, Bot(token=config.bot_token), select_localized_clip,
-                            localized_caption, reload_clip, stats))
-            status = 'failed' if stats.failed or stats.uncertain else 'completed'
+            # Send due lessons first, so future preparation cannot delay them.
+            with ExitStack() as media:
+                def restore_clip(content):
+                    return media.enter_context(preparation.restore(content, reload_clip))
+                asyncio.run(run(subscribers, Bot(token=config.bot_token), select_localized_clip,
+                                localized_caption, restore_clip, stats, prepared_lookup=preparation.ready))
+            prepared, failed = preparation.prepare(db.due_subscribers(10), select_localized_clip, localized_caption)
+            log.info('Lookahead: %s slots prepared, %s failed', prepared, failed)
+            status = 'failed' if stats.failed or stats.uncertain or failed else 'completed'
         finally:
             try:
                 delivery_store.record_run(status, len(subscribers), stats.dict(), time.monotonic() - started)
