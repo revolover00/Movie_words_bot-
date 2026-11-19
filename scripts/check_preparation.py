@@ -94,4 +94,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as error:
+        import traceback
+        frame = traceback.extract_tb(error.__traceback__)[-1]
+        print(f'::error title=Preparation integration::{type(error).__name__} at {Path(frame.filename).name}:{frame.lineno}', flush=True)
+        sys.exit(1)
