@@ -44,6 +44,7 @@ jobs:
       - name: Count subscribers and prepare delivery
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           SEND_NOW: ${{ github.event_name == 'workflow_dispatch' && inputs.send_now }}
         run: python scripts/prepare_delivery.py
 

@@ -14,14 +14,26 @@ import psycopg2
 import psycopg2.extras
 
 from config import config
+from bot_identity import database_schema
+from psycopg2 import sql
 
 log = logging.getLogger(__name__)
 
 
 def connect():
     """Open a Neon Postgres connection."""
-    config.validate("database_url")
-    return psycopg2.connect(config.database_url)
+    config.validate("database_url", "bot_token")
+    schema = database_schema(config.bot_token)
+    conn = psycopg2.connect(config.database_url)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql.SQL('CREATE SCHEMA IF NOT EXISTS {}').format(sql.Identifier(schema)))
+            cur.execute(sql.SQL('SET search_path TO {}').format(sql.Identifier(schema)))
+        conn.commit()
+        return conn
+    except Exception:
+        conn.close()
+        raise
 
 
 def init_db() -> None:

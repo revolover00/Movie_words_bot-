@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 import handler from '../api/telegram.js';
 
+process.env.BOT_TOKEN = '123456:test-token';
 const queries = [];
 const calls = [];
 let inputState = null;
@@ -191,4 +192,12 @@ test('back button returns to previous step without overwriting choices', async (
   assert.equal(queries.find(q => q.sql.includes('SET input_state = $1')).values[0], 'setup_explain');
   assert.ok(!queries.some(q => q.sql.includes('SET interval_minutes = $1')));
   setupSettings = null;
+});
+
+
+test('webhook isolates tables by the current bot identity', async () => {
+  queries.length = 0;
+  await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, text: '/help' } } }, res());
+  assert.ok(queries.some(q => q.sql === 'CREATE SCHEMA IF NOT EXISTS "bot_123456"'));
+  assert.ok(queries.some(q => q.sql === 'SET search_path TO "bot_123456"'));
 });
