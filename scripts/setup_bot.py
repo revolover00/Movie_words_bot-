@@ -9,6 +9,7 @@ import db
 from config import config
 from bot_identity import database_schema
 from scripts.bot_profile import configure_profile
+from webhook_auth import webhook_secret
 
 
 def main():
@@ -42,7 +43,8 @@ def main():
         cur.execute('SELECT count(*), count(*) FILTER (WHERE is_active) FROM subscribers')
         total, active = cur.fetchone()
     url = os.environ.get('WEBHOOK_URL', 'https://scenelingoo.vercel.app/api/telegram')
-    api('setWebhook', url=url, allowed_updates=['message', 'callback_query'])
+    api('setWebhook', url=url, allowed_updates=['message', 'callback_query'],
+        secret_token=webhook_secret(config.bot_token), drop_pending_updates=False)
     info = api('getWebhookInfo')
     if info.get('url') != url:
         raise RuntimeError('Webhook URL verification failed')

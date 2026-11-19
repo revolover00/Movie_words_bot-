@@ -1,5 +1,6 @@
 // Telegram webhook: subscribe, change CEFR level, and see the latest expression.
 import pg from 'pg';
+import { authorizedWebhook } from '../lib/webhook-auth.js';
 import { applyLessonAction, lessonAction } from '../lib/lesson-actions.js';
 import { readFileSync } from 'node:fs';
 const reliabilitySql = readFileSync(new URL('../reliability.sql', import.meta.url), 'utf8');
@@ -164,6 +165,10 @@ async function renderMessage(chatId, text, keyboard, messageId) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).send('SceneLingo webhook');
+  if (!process.env.BOT_TOKEN) return res.status(503).send('Webhook unavailable');
+  if (!authorizedWebhook(req.headers?.['x-telegram-bot-api-secret-token'], process.env.BOT_TOKEN)) {
+    return res.status(403).send('Forbidden');
+  }
   try {
     const update = req.body || {};
     const callback = update.callback_query;

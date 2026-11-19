@@ -1,7 +1,9 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import handler from '../api/telegram.js';
+import rawHandler from '../api/telegram.js';
+import { webhookSecret } from '../lib/webhook-auth.js';
+const handler = (req, res) => rawHandler({...req, headers: {'x-telegram-bot-api-secret-token': webhookSecret(process.env.BOT_TOKEN)}}, res);
 
 process.env.BOT_TOKEN = '123456:test-token';
 const queries = [];
@@ -253,4 +255,12 @@ test('other edit errors remain failures without sending duplicate messages', asy
     assert.equal(status, 500);
     assert.ok(!methods.includes('sendMessage'));
   } finally { globalThis.fetch = previous; console.error = previousError; setupSettings = null; }
+});
+
+
+test('unauthenticated updates are rejected before database or Bot API access', async () => {
+  queries.length = 0; calls.length = 0;
+  const response = {status(code){assert.equal(code,403);return this;},send(){}};
+  await rawHandler({method:'POST',body:{message:{text:'/start',chat:{id:1,type:'private'}}}}, response);
+  assert.equal(queries.length,0); assert.equal(calls.length,0);
 });

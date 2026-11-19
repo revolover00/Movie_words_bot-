@@ -57,3 +57,10 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GROQ_MODEL: qwen/qwen3.8-27b
         run: python scripts/run_daily_with_diagnostics.py
+
+      - name: Check webhook health
+        if: always()
+        env:
+          VERIFY_AUTH: 'true'
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: python scripts/check_webhook.py
