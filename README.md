@@ -112,10 +112,10 @@ python daily_job.py  # sends to subscribers whose delivery time is due
 
 ### 8. Schedule via cron-job.org
 
-Create a free job on [cron-job.org](https://cron-job.org) scheduled at minutes 0 and 30 each hour that POSTs to:
+Create a free job on [cron-job.org](https://cron-job.org) scheduled every 10 minutes that POSTs directly to the current repository URL (update it after any repository rename):
 
 ```
-https://api.github.com/repos/<OWNER>/<REPO>/dispatches
+https://api.github.com/repos/revolover00/scenelingo/dispatches
 ```
 
 with headers `Authorization: Bearer <PAT>`, `Accept: application/vnd.github+json`, and `Content-Type: application/json`, and body `{"event_type": "daily-word"}`.
