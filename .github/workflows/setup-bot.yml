@@ -1,0 +1,30 @@
+name: Configure Telegram bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_bot_id:
+        description: Numeric Telegram bot ID to verify before making changes
+        required: true
+        type: string
+
+concurrency:
+  group: movie-expressions
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Initialize bot database and register webhook
+        env:
+          EXPECTED_BOT_ID: ${{ inputs.expected_bot_id }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/setup_bot.py

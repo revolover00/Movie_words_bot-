@@ -83,6 +83,16 @@ async function withDb(fn) {
   const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   await client.connect();
   try {
+    const botId = (process.env.BOT_TOKEN || '').split(':')[0];
+    if (!/^[0-9]+$/.test(botId)) throw new Error('A valid BOT_TOKEN is required');
+    // Digits-only bot ID keeps this identifier safe and stable across token rotations.
+    const schema = `bot_${botId}`;
+    await client.query(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
+    await client.query(`SET search_path TO "${schema}"`);
+    await client.query(`CREATE TABLE IF NOT EXISTS subscribers (
+      chat_id BIGINT PRIMARY KEY, username TEXT, first_name TEXT,
+      subscribed_at TIMESTAMPTZ NOT NULL DEFAULT now(), is_active BOOLEAN NOT NULL DEFAULT TRUE
+    )`);
     // Idempotent migration: preserves existing subscriptions and defaults them to A2.
     await client.query("ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS level TEXT NOT NULL DEFAULT 'A2'");
     await client.query(`CREATE TABLE IF NOT EXISTS sent_phrases (
