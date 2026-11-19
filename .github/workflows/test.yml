@@ -19,4 +19,4 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
-      - run: node --test tests/telegram.test.js
+      - run: npm test

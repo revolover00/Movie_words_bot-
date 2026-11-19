@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS subscriber_preferences (
       CHECK (learning_language IN ('en', 'zh', 'hi', 'es', 'fr', 'ar', 'pt', 'ru', 'de', 'ja')),
     explanation_language TEXT NOT NULL DEFAULT 'ar'
       CHECK (explanation_language IN ('en', 'zh', 'hi', 'es', 'fr', 'ar', 'pt', 'ru', 'de', 'ja')),
-    interval_minutes INTEGER NOT NULL DEFAULT 180 CHECK (interval_minutes BETWEEN 5 AND 1440),
+    interval_minutes INTEGER NOT NULL DEFAULT 180 CHECK (interval_minutes BETWEEN 30 AND 1440),
     next_due_at TIMESTAMPTZ,
     input_state TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -46,3 +46,21 @@ CREATE TABLE IF NOT EXISTS subscriber_preferences (
 ALTER TABLE subscriber_preferences ADD COLUMN IF NOT EXISTS input_state TEXT;
 
 ALTER TABLE sent_phrases ADD COLUMN IF NOT EXISTS learning_language TEXT NOT NULL DEFAULT 'en';
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'subscriber_preferences'::regclass
+    AND conname = 'subscriber_preferences_interval_minutes_check'
+    AND pg_get_constraintdef(oid) NOT LIKE '%30%') THEN
+-- Raise old short intervals while preserving the remaining preferences.
+ALTER TABLE subscriber_preferences DROP CONSTRAINT IF EXISTS subscriber_preferences_interval_minutes_check;
+UPDATE subscriber_preferences SET interval_minutes = 30,
+    next_due_at = GREATEST(next_due_at, now() + interval '30 minutes'), updated_at = now()
+    WHERE interval_minutes < 30;
+ALTER TABLE subscriber_preferences ADD CONSTRAINT subscriber_preferences_interval_minutes_check
+    CHECK (interval_minutes BETWEEN 30 AND 1440);
+  END IF;
+END $$;
+
+-- Bot menus are independent of the learning and explanation languages.
+ALTER TABLE subscriber_preferences ADD COLUMN IF NOT EXISTS ui_language TEXT NOT NULL DEFAULT 'ar'
+    CHECK (ui_language IN ('ar', 'en'));

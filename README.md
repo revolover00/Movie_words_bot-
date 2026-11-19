@@ -25,7 +25,7 @@ daily_job.py
 Telegram Bot API       → send to each due subscriber
 ```
 
-Use `/start` to subscribe, `/level` to pick A2–C2, `/learn` for the learning language, `/explain` for the explanation language, and `/interval` for a whole number of minutes from 5 to 1440. `/today` shows the most recent expression for the selected level and learning language; `/stop` unsubscribes. Both language menus offer English, Chinese, Hindi, Spanish, French, Arabic, Portuguese, Russian, German and Japanese. Existing subscribers retain their subscription and default to English, Egyptian Arabic and 180 minutes. CEFR labels are approximate.
+Use `/start` for guided setup: bot interface language (Arabic or English) → learning language → CEFR level → explanation language → delivery interval → review and confirm. Delivery starts only after confirmation. Use `/level` to pick A2–C2, `/learn` for the learning language, `/explain` for the explanation language, and `/interval` to choose a preset from 30 minutes to 24 hours. `/today` shows the most recent expression for the selected level and learning language; `/stop` unsubscribes. Both language menus offer English, Chinese, Hindi, Spanish, French, Arabic, Portuguese, Russian, German and Japanese. Intervals offer preset buttons (half an hour to 24 hours) only; typed numbers are not accepted. `/language` changes the bot interface language without changing learning or explanation preferences. Existing intervals below 30 minutes are raised to 30. Existing subscribers retain their subscription and default to English, Egyptian Arabic and 180 minutes. CEFR labels are approximate.
 
 ## Stack
 
