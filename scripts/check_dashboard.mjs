@@ -1,11 +1,23 @@
-// Production smoke test. Password is supplied only through a temporary Actions secret.
+// Live unauthenticated endpoint check plus authenticated browser integration
+// against the actual handler and database. No test password leaves this process.
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { randomBytes, createHash } from 'node:crypto';
 import { chromium } from 'playwright';
-const password = process.env.DASHBOARD_SMOKE_PASSWORD;
-if (!password) throw new Error('Missing smoke credentials');
-const base = 'https://scenelingoo.vercel.app';
-const denied = await fetch(base + '/api/dashboard?data=1');
+import handler from '../api/dashboard.js';
+const password = randomBytes(32).toString('hex');
+process.env.DASHBOARD_PASSWORD_HASH = createHash('sha256').update(password).digest('hex');
+const denied = await fetch('https://scenelingoo.vercel.app/api/dashboard?data=1');
 assert.equal(denied.status, 401);
+const server = createServer((req, res) => {
+  req.query = Object.fromEntries(new URL(req.url, 'http://localhost').searchParams);
+  res.status = code => { res.statusCode = code; return res; };
+  res.send = data => res.end(data);
+  res.json = data => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(data)); };
+  handler(req, res).catch(() => { res.statusCode = 500; res.end('Handler failure'); });
+});
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({ httpCredentials: { username: 'admin', password } });
@@ -27,5 +39,5 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   assert.deepEqual(errors, []);
-  console.log('::notice title=Dashboard smoke::Private authentication, real database aggregates, desktop render, refresh and mobile layout passed.');
-} finally { await browser.close(); }
+  console.log('::notice title=Dashboard smoke::Production rejects unauthenticated access. Actual handler integration passed private auth, real database aggregates, desktop render, refresh and mobile layout.');
+} finally { await browser.close(); server.close(); }
