@@ -1,6 +1,8 @@
 name: Daily Word
 
 on:
+  schedule:
+    - cron: '*/10 * * * *'
   repository_dispatch:
     types: [daily-word]
   workflow_dispatch:

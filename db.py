@@ -178,7 +178,7 @@ def due_subscribers(lookahead_minutes: int = 0) -> list[dict]:
                 FROM subscribers s
                 LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
                 WHERE s.is_active = TRUE
-                  AND COALESCE(p.input_state, '') NOT LIKE 'setup_%'
+                  AND LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'
                   AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now() + %s * interval '1 minute'
                 ORDER BY COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours'), s.chat_id
             """, (lookahead_minutes,))
