@@ -1,21 +1,50 @@
-MIT License
+SceneLingo — All Rights Reserved
 
-Copyright (c) 2026 revolover00
+Copyright (c) 2026 SceneLingo.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Scope
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+These terms apply only to new, separately copyrightable original material first
+published with these terms, to the extent the project rights holder owns or is
+authorized to license that material (the "Restricted Material"). They do not
+revoke or restrict permissions already granted for previously MIT-licensed
+material. See LEGACY-MIT.txt and the repository history.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. No license granted
+
+Except as required by applicable law, expressly authorized by the applicable
+hosting platform terms, or permitted by a separate written agreement with the
+rights holder, no permission is granted to copy, reproduce, modify, distribute,
+publish, sublicense, sell, commercially exploit, deploy, host, execute or otherwise
+use the Restricted Material, in whole or in part. These restrictions apply to both
+commercial and non-commercial use. Public availability does not itself grant
+permission to reuse the Restricted Material.
+
+3. Platform permissions and prior rights
+
+Nothing in these terms limits rights granted under GitHub's applicable Terms of
+Service, including applicable viewing and forking rights for a public repository.
+Nothing in these terms restricts rights arising under prior licenses, statutory
+exceptions, or third-party licenses. Prior MIT permissions continue to apply to
+previously MIT-licensed material, including when it appears in a later version.
+
+4. Name and identity
+
+No trademark license or permission to imply official affiliation, endorsement or
+sponsorship is granted. No assertion of trademark registration is made.
+
+5. Third-party materials
+
+Third-party software, movie clips, audio and other third-party materials are not
+owned or relicensed by this notice. Their respective rights and licenses apply.
+
+6. Disclaimer
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE RESTRICTED MATERIAL IS
+PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY ARISING FROM OR IN CONNECTION WITH THE RESTRICTED MATERIAL.
+
+For permission requests, contact the repository owner through GitHub:
+https://github.com/revolover00/scenelingo
