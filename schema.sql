@@ -64,3 +64,11 @@ END $$;
 -- Bot menus are independent of the learning and explanation languages.
 ALTER TABLE subscriber_preferences ADD COLUMN IF NOT EXISTS ui_language TEXT NOT NULL DEFAULT 'ar'
     CHECK (ui_language IN ('ar', 'en'));
+
+-- Operational outcomes only; never store API secrets or raw exception text.
+CREATE TABLE IF NOT EXISTS delivery_runs (
+    id BIGSERIAL PRIMARY KEY,
+    status TEXT NOT NULL CHECK (status IN ('idle', 'completed', 'failed')),
+    due_count INTEGER NOT NULL CHECK (due_count >= 0),
+    finished_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

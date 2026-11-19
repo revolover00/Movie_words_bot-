@@ -24,6 +24,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Initialize bot database and register webhook
         env:
+          WEBHOOK_URL: https://scenelingoo.vercel.app/api/telegram
           EXPECTED_BOT_ID: ${{ inputs.expected_bot_id }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

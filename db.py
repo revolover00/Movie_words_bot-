@@ -231,3 +231,9 @@ def still_due_with_settings(subscriber: dict) -> bool:
         """, (subscriber['chat_id'], subscriber['level'], subscriber['learning_language'],
               subscriber['explanation_language'], subscriber['settings_updated_at']))
         return cur.fetchone() is not None
+
+
+def record_delivery_run(status: str, due_count: int) -> None:
+    """Record coarse run outcomes, not a claim of per-user delivery or AI usage."""
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute('INSERT INTO delivery_runs (status, due_count) VALUES (%s, %s)', (status, due_count))
