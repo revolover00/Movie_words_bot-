@@ -9,6 +9,10 @@
     {
       "source": "/dashboard",
       "destination": "/api/dashboard"
+    },
+    {
+      "source": "/dashboard.html",
+      "destination": "/api/dashboard"
     }
   ]
 }
