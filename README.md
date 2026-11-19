@@ -1,6 +1,6 @@
 # SceneLingo 🎬
 
-A free, open-source Telegram bot for useful expressions with matching short movie clips and explanations. Subscribers choose a CEFR level, learning language, explanation language and delivery interval inside Telegram.
+A Telegram bot for useful expressions with matching short movie clips and explanations. Subscribers choose a CEFR level, learning language, explanation language and delivery interval inside Telegram.
 
 > Learn languages by watching movies — expressions for your level, zero self-hosting.
 
@@ -172,12 +172,21 @@ node --test tests/telegram.test.js
 
 ## License
 
-Copyright © 2026 SceneLingo. Licensed under the [MIT License](LICENSE).
+Copyright © 2026 SceneLingo. **All rights reserved for new original material
+covered by the current [LICENSE](LICENSE).**
 
-Copies or substantial portions of the software must retain the original copyright
-and permission notices. MIT does not expressly grant trademark rights in the
-SceneLingo name or visual identity. Third-party content remains the property of
-its respective owners.
+Copying, modification, redistribution, hosting and commercial or non-commercial
+use of that restricted material require prior written permission, except where
+applicable law or platform terms provide otherwise. This is not an open-source
+license.
+
+**Previously MIT-licensed material remains available under MIT**, including its
+commercial-use permissions. This change is not retroactive and does not restrict
+that material merely because it is included in a newer version. The historical
+notice is preserved in [LEGACY-MIT.txt](LEGACY-MIT.txt).
+
+Public GitHub viewing and forking permissions remain governed by GitHub's terms.
+Third-party content remains subject to its owners' rights and licenses.
 See [Rights and attribution](OWNERSHIP.md).
 
 ### Starting with a different Telegram bot
