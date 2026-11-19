@@ -208,3 +208,16 @@ explanation language, irrespective of delivery interval.
 
 The old Vercel domain is retained for compatibility. New webhook setup uses
 `https://scenelingoo.vercel.app/api/telegram`.
+
+### Lesson captions
+
+Lesson generation returns validated JSON (`meaning`, `usage`, `example`,
+`translation`) rather than a free-form caption. A separate renderer owns the
+localized headings, spacing, source attribution and Telegram caption budget.
+The verified expression is preserved exactly; the practice example is explicitly
+labeled as new, not a movie quote. The prompt forbids invented scene details.
+Malformed or missing fields fail closed instead of sending broken lessons.
+Presentation limits count UTF-16 units, including emoji, and omit a source link
+when it cannot fit rather than cutting the expression or lesson block in half.
+This uses one explanation request per requested explanation-language cohort,
+not one request per subscriber, with no additional generation on idle runs.

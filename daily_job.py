@@ -13,7 +13,7 @@ import clip_cafe
 import multilingual
 import source_first
 from config import config
-from groq_meaning import get_meaning
+from lessons import caption as render_caption
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -28,20 +28,15 @@ def build_message(level: str):
         except RuntimeError as exc:
             log.info('No matching clip for %r: %s', expression.text, exc)
             continue
-        meaning = get_meaning(expression.text, level=level, topic=expression.topic)
-        caption = f"🎬 تعبير {level}\n\n{meaning}\n\n🎞️ من: {clip.title}\n🔗 {clip.url}"
-        if len(caption) > 1024:
-            raise ValueError('Telegram video caption exceeds 1024 characters')
+        caption = localized_caption(expression.text, clip, level, 'en', 'ar')
         return expression, clip, caption
     raise RuntimeError(f'No matching movie clip for level {level}')
 
 
 def localized_caption(text: str, clip, level: str, learning: str, explanation: str) -> str:
     meaning = multilingual.meaning(text, learning, explanation, level)
-    caption = f'🎬 {level} · {learning.upper()}\n\n{text}\n\n{meaning}\n\n🎞️ {clip.title}\n🔗 {clip.url}'
-    if len(caption) > 1024:
-        raise ValueError('Telegram video caption exceeds 1024 characters')
-    return caption
+    return render_caption(text, meaning, level, learning, explanation, clip.title, clip.url)
+
 
 
 def select_localized_clip(level: str, learning: str):
