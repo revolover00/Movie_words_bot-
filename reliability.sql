@@ -78,3 +78,11 @@ CREATE TABLE IF NOT EXISTS prepared_slots (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY(chat_id,due_at)
 );
+
+CREATE TABLE IF NOT EXISTS preparation_runs (
+    id BIGSERIAL PRIMARY KEY,
+    prepared_count INTEGER NOT NULL,
+    failed_count INTEGER NOT NULL,
+    duration_seconds DOUBLE PRECISION NOT NULL,
+    finished_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

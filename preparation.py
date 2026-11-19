@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import logging
+import time
 
 import db
 import delivery_store as store
@@ -64,7 +65,7 @@ def reserve(sub, content_id):
             (sub['chat_id'],sub['due_at'],sub['settings_updated_at'],content_id))
 
 
-def prepare(subscribers, select, explain):
+def _prepare(subscribers, select, explain):
     """Retry missing preparation next tick; never mark a partial lesson ready."""
     groups = defaultdict(list)
     for sub in subscribers:
@@ -128,3 +129,23 @@ def restore(content, fallback):
         else:
             yield fallback(content)
     return materialize()
+
+
+def prepare(subscribers, select, explain):
+    """Record preparation separately from delivery; telemetry never masks results."""
+    started = time.monotonic()
+    prepared, failed = 0, 0
+    try:
+        prepared, failed = _prepare(subscribers, select, explain)
+        return prepared, failed
+    except Exception:
+        failed = max(1, len(subscribers))
+        raise
+    finally:
+        try:
+            with db.connect() as conn, conn.cursor() as cur:
+                cur.execute("""INSERT INTO preparation_runs(prepared_count,failed_count,duration_seconds)
+                    VALUES(%s,%s,%s)""", (prepared, failed, time.monotonic()-started))
+                cur.execute("DELETE FROM preparation_runs WHERE finished_at<now()-interval '30 days'")
+        except Exception:
+            log.warning('Preparation telemetry unavailable')

@@ -7,6 +7,15 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Verify preparation lifecycle in disposable database schema
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: python scripts/check_preparation.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
