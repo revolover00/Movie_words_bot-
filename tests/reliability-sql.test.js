@@ -62,3 +62,15 @@ test('prepared slots persist media and require matching settings, caption and un
   assert.equal((await db.query(ready,args)).rows.length,1);
  } finally {await db.close();}
 });
+
+test('dashboard preparation aggregates execute in PostgreSQL', async()=>{
+ const db=new PGlite();
+ try {
+  for(const file of ['schema.sql','scheduling.sql','reliability.sql'])await db.exec(read(file));
+  const query=read('lib/dashboard.js').match(/const prep = await client.query\(`([\s\S]*?)`\)/)[1];
+  const result=await db.query(query);
+  assert.equal(result.rows[0].ready,0);
+  assert.equal(result.rows[0].media_items,0);
+  assert.equal(result.rows[0].media_bytes,0);
+ } finally {await db.close();}
+});

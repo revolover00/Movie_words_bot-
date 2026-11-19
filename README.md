@@ -112,10 +112,10 @@ python daily_job.py  # sends to subscribers whose delivery time is due
 
 ### 8. Schedule via cron-job.org
 
-Create a free job on [cron-job.org](https://cron-job.org) scheduled at minutes 0 and 30 each hour that POSTs to:
+Create a free job on [cron-job.org](https://cron-job.org) scheduled every 10 minutes that POSTs directly to the current repository URL (update it after any repository rename):
 
 ```
-https://api.github.com/repos/<OWNER>/<REPO>/dispatches
+https://api.github.com/repos/revolover00/scenelingo/dispatches
 ```
 
 with headers `Authorization: Bearer <PAT>`, `Accept: application/vnd.github+json`, and `Content-Type: application/json`, and body `{"event_type": "daily-word"}`.
@@ -345,3 +345,31 @@ The external `daily-word` dispatch remains supported. Both paths share workflow
 concurrency and the database worker lock; native schedules can be delayed and do
 not guarantee exact delivery times. The native schedule runs from the default
 branch and depends on GitHub Actions being enabled.
+
+
+### Webhook authentication and operational checks
+
+POST updates require Telegram's `X-Telegram-Bot-Api-Secret-Token` header. The value
+is derived consistently by Python and JavaScript using HMAC-SHA256 with a
+versioned, domain-separated message and the existing bot token; it is not the bot
+token itself. Do not log it. Token rotation requires webhook re-registration.
+Configure Telegram bot registers the secret while preserving pending updates.
+For rollout, first run its webhook-only repair mode from the new revision, then
+deploy the authenticated receiver. Profile-only mode still never changes webhooks.
+
+Each delivery workflow also checks the expected webhook URL, authenticated endpoint
+health and rejection of unauthenticated updates. A recent Telegram delivery error
+with pending updates fails the check. It does not automatically overwrite webhook
+changes during routine delivery. GitHub failed-run notifications depend on the
+repository/account notification settings; there is no separate SMS/email service.
+
+Preparation counts, failures, duration and current media buffer usage are visible
+in the private dashboard. Preparation logs are retained for 30 days. A stale-run
+warning appears after 30 minutes without a recorded run; a recent manual run is
+not proof that the external cron or GitHub scheduler is working automatically.
+
+The browser integration workflow also runs a disposable-schema Postgres lifecycle
+check: prepare synthetic fixture content, delete its local file, reject early
+sending, shift only the fixture's clock to due, restore persisted media and simulate
+one send. No subscriber data is changed and no Telegram call is made. This tests
+storage and routing, not audio quality or actual Telegram transport.

@@ -27,6 +27,8 @@ try {
   for (const key of ['total', 'active', 'setup', 'stopped', 'due']) assert.equal(typeof data[key], 'number');
   assert.equal(data.total, data.active + data.setup + data.stopped);
   assert.ok(data.due <= data.active);
+  for (const key of ['ready','media_bytes','media_items']) assert.equal(typeof data.preparation[key], 'number');
+  assert.ok(Array.isArray(data.preparation.runs));
   assert.ok(!JSON.stringify(data).includes('chat_id'));
   const page = await context.newPage();
   const errors = [];
