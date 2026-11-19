@@ -19,7 +19,7 @@ def test_due_query_excludes_inactive_and_uses_database_time(monkeypatch):
     assert db.due_subscribers() == [{'chat_id': 1, 'level': 'A2'}]
     sql = cur.execute.call_args.args[0]
     assert 's.is_active = TRUE' in sql
-    assert "COALESCE(p.input_state, '') NOT LIKE 'setup_%'" in sql
+    assert "LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'" in sql
     assert '<= now()' in sql
 
 
@@ -69,3 +69,13 @@ def test_lookahead_is_parameterized_and_preflight_uses_same_horizon(monkeypatch)
     user = dict(chat_id=1, level='B1', learning_language='ja', explanation_language='ar', settings_updated_at='v')
     assert db.still_due_with_settings(user, 10)
     assert cur.execute.call_args.args[1][-1] == 10
+
+
+def test_due_query_has_only_bound_percent_placeholders(monkeypatch):
+    # psycopg2 interprets literal '%' when parameters are supplied, unlike mocks.
+    cur = mock_db(monkeypatch)
+    for horizon in (0, 10):
+        db.due_subscribers(horizon)
+        sql, params = cur.execute.call_args.args
+        assert sql.count('%s') == len(params)
+        assert '%' not in sql.replace('%s', '').replace('%%', '')
