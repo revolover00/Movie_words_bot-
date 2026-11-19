@@ -1,0 +1,66 @@
+name: Daily Word
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  repository_dispatch:
+    types: [daily-word]
+  workflow_dispatch:
+    inputs:
+      send_now:
+        description: Make all active subscribers with completed setup due now
+        type: boolean
+        default: false
+      probe_yarn:
+        description: Test Yarn without sending messages
+        type: boolean
+        default: false
+
+concurrency:
+  group: movie-expressions
+  cancel-in-progress: false
+
+jobs:
+  probe-yarn:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.probe_yarn }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/probe_yarn.py
+
+  send:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.probe_yarn }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies and bundled FFmpeg
+        run: pip install -r requirements.txt
+
+      - name: Count subscribers and prepare delivery
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          SEND_NOW: ${{ github.event_name == 'workflow_dispatch' && inputs.send_now }}
+        run: python scripts/prepare_delivery.py
+
+      - name: Run daily job
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: qwen/qwen3.8-27b
+        run: python scripts/run_daily_with_diagnostics.py
+
+      - name: Check webhook health
+        if: always()
+        env:
+          VERIFY_AUTH: 'true'
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: python scripts/check_webhook.py

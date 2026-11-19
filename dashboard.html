@@ -1,0 +1,1340 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>SceneLingo · لوحة الإدارة</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #000;
+        --panel: #0a0a0a;
+        --raised: #111;
+        --border: #242424;
+        --text: #ededed;
+        --muted: #888;
+        --blue: #52a8ff;
+        --green: #50e3a4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.7 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button,
+      a,
+      input {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 4px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.4;
+      }
+      [hidden],
+      .panel-hidden {
+        display: none !important;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .topbar {
+        height: 72px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 36px;
+        gap: 20px;
+      }
+      .workspace {
+        display: flex;
+        align-items: center;
+        gap: 17px;
+      }
+      .mark {
+        width: 30px;
+        height: 30px;
+        border: 1px solid #555;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font: 700 17px system-ui;
+        background: linear-gradient(140deg, #262626, #080808);
+      }
+      .slash {
+        color: #444;
+        font: 24px monospace;
+      }
+      .brand {
+        font-size: 16px;
+        font-weight: 650;
+        letter-spacing: -0.5px;
+      }
+      .plan,
+      .tag {
+        font-size: 11px;
+        color: #aaa;
+        border: 1px solid #333;
+        border-radius: 20px;
+        padding: 2px 9px;
+        white-space: nowrap;
+      }
+      .account {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: #a1a1a1;
+        font-size: 12px;
+      }
+      .avatar {
+        border: 1px solid #333;
+        background: #171717;
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        color: #ddd;
+      }
+      .nav-wrap {
+        border-bottom: 1px solid var(--border);
+        background: #080808;
+      }
+      .tabs {
+        max-width: 1376px;
+        margin: auto;
+        display: flex;
+        padding: 0 32px;
+        gap: 30px;
+        overflow: auto;
+      }
+      .tab {
+        background: none;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        padding: 17px 2px 15px;
+        color: #888;
+        white-space: nowrap;
+        font-size: 13px;
+      }
+      .tab:hover {
+        color: #eee;
+      }
+      .tab[aria-selected="true"] {
+        border-bottom-color: #ededed;
+        color: #ededed;
+      }
+      main {
+        max-width: 1376px;
+        margin: auto;
+        padding: 42px 32px 0;
+      }
+      .page-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      .eyebrow {
+        font:
+          11px/1.5 ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+        letter-spacing: 1.8px;
+        color: #777;
+        text-transform: uppercase;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.4;
+        letter-spacing: -1px;
+        margin: 8px 0 10px;
+        font-weight: 650;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.2px;
+      }
+      .muted,
+      small {
+        color: var(--muted);
+      }
+      .subheading {
+        margin: 0;
+        font-size: 13px;
+        color: #888;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .primary,
+      .secondary {
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 8px 14px;
+        white-space: nowrap;
+        transition: background 0.15s;
+      }
+      .primary {
+        background: #ededed;
+        color: #111;
+        border-color: #ededed;
+        font-weight: 550;
+      }
+      .primary:hover {
+        background: #ccc;
+      }
+      .secondary {
+        background: #0a0a0a;
+        color: #ddd;
+      }
+      .secondary:hover {
+        background: #1a1a1a;
+      }
+      .status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        color: #aaa;
+        white-space: nowrap;
+      }
+      .status-chip i {
+        width: 6px;
+        height: 6px;
+        background: #888;
+        border-radius: 50%;
+      }
+      .status-line {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #0a0a0a;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        color: #999;
+        margin-bottom: 24px;
+      }
+      .status-icon {
+        color: #aaa;
+        border: 1px solid #444;
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font: 11px monospace;
+      }
+      #scheduler-health {
+        margin: 0;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 24px;
+        background: #080808;
+      }
+      .card {
+        padding: 22px 24px;
+        position: relative;
+        min-width: 0;
+        border-inline-end: 1px solid var(--border);
+      }
+      .card:last-child {
+        border: 0;
+      }
+      .card small {
+        font-size: 12px;
+        color: #999;
+      }
+      .number {
+        font:
+          500 32px/1.3 ui-monospace,
+          SFMono-Regular,
+          Consolas,
+          monospace;
+        letter-spacing: -1.5px;
+        margin-top: 16px;
+        color: #f5f5f5;
+      }
+      .card:before {
+        content: "";
+        position: absolute;
+        top: 24px;
+        inset-inline-end: 20px;
+        width: 5px;
+        height: 5px;
+        border: 1px solid #555;
+        border-radius: 50%;
+      }
+      .card:hover {
+        background: #0e0e0e;
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+      }
+      .section-head p {
+        font-size: 12px;
+        color: #888;
+        margin: 5px 0 0;
+      }
+      .section-label {
+        font:
+          10px ui-monospace,
+          monospace;
+        letter-spacing: 1px;
+        color: #666;
+        white-space: nowrap;
+      }
+      section {
+        background: #080808;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 24px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .section-body {
+        padding: 20px 24px;
+      }
+      .section-body p {
+        margin: 0;
+      }
+      .section-note {
+        font-size: 11px;
+        color: #737373;
+        padding: 13px 24px;
+        border-top: 1px solid #1e1e1e;
+        line-height: 1.8;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 24px;
+      }
+      .hint {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 21px 24px;
+        margin-bottom: 24px;
+        border: 1px solid #213246;
+        background: linear-gradient(110deg, #080b10, #080808);
+        border-radius: 8px;
+      }
+      .hint-icon {
+        width: 30px;
+        height: 30px;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        border: 1px solid #254160;
+        border-radius: 6px;
+        color: #52a8ff;
+      }
+      .hint strong {
+        font-size: 13px;
+        font-weight: 550;
+      }
+      .hint p {
+        font-size: 12px;
+        color: #888;
+        margin: 4px 0 0;
+      }
+      .scroll {
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scrollbar-width: thin;
+        scrollbar-color: #333 transparent;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        text-align: right;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      th {
+        font-weight: 450;
+        color: #888;
+        background: #0d0d0d;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      th,
+      td {
+        padding: 14px 20px;
+        border-bottom: 1px solid #1d1d1d;
+        text-align: start;
+      }
+      td {
+        color: #c3c3c3;
+        max-width: 300px;
+      }
+      td.long {
+        min-width: 110px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      tbody tr:hover {
+        background: #111;
+      }
+      #subscribers table {
+        min-width: 1800px;
+      }
+      #subscribers th:first-child,
+      #subscribers td:first-child {
+        position: sticky;
+        inset-inline-start: 0;
+        background: #0c0c0c;
+        z-index: 1;
+        font-family: ui-monospace, monospace;
+        direction: ltr;
+        text-align: center;
+        border-inline-end: 1px solid #222;
+      }
+      #subscribers td:nth-child(2) {
+        direction: ltr;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 5px;
+        padding: 2px 7px;
+        border: 1px solid #333;
+        background: #151515;
+        color: #bbb;
+        white-space: nowrap;
+        font-size: 11px;
+      }
+      .badge.success {
+        color: #70dfb0;
+        background: #071e15;
+        border-color: #173f2c;
+      }
+      .badge.danger {
+        color: #ff9a9a;
+        background: #260e0e;
+        border-color: #512020;
+      }
+      .badge.warning {
+        color: #edc781;
+        background: #251b0b;
+        border-color: #4a3719;
+      }
+      .empty {
+        min-height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        font-size: 13px;
+        margin: 0;
+        padding: 24px;
+      }
+      .table-tools {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--border);
+      }
+      .search-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 0 12px;
+        max-width: 440px;
+        flex: 1;
+        background: #050505;
+      }
+      .search-box span {
+        color: #777;
+        font-size: 20px;
+      }
+      input {
+        background: none;
+        border: 0;
+        color: #ededed;
+        width: 100%;
+        min-width: 0;
+        padding: 9px 0;
+        outline-offset: 0;
+      }
+      input::placeholder {
+        color: #666;
+        font-size: 12px;
+      }
+      .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 24px;
+        border-top: 1px solid var(--border);
+      }
+      .pagination span {
+        color: #888;
+        font-size: 12px;
+      }
+      .table-summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: #777;
+      }
+      .lock {
+        font-size: 12px;
+      }
+      #updated {
+        font-size: 11px;
+        margin-top: 8px;
+        color: #666;
+      }
+      #error {
+        color: #ffaaaa;
+        background: #200c0c;
+        border: 1px solid #552020;
+        padding: 14px 18px;
+        border-radius: 6px;
+        margin-bottom: 24px;
+        font-size: 13px;
+      }
+      .metric-caption {
+        font-size: 11px;
+        color: #666;
+        margin: 0 0 12px;
+      }
+      .ai-summary {
+        font-family: ui-monospace, system-ui, monospace;
+        line-height: 2.2;
+        font-size: 13px;
+      }
+      .footer {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 26px 0;
+        margin-top: 24px;
+        border-top: 1px solid var(--border);
+        color: #666;
+        font-size: 11px;
+      }
+      .footer p {
+        max-width: 640px;
+        margin: 0;
+      }
+      .footer-brand {
+        color: #999;
+        font:
+          12px ui-monospace,
+          monospace;
+      }
+      .panel-intro {
+        padding: 0 0 20px;
+        font-size: 12px;
+        color: #777;
+      }
+      .live-dot {
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #50e3a4;
+        margin-inline-end: 6px;
+      }
+      .skeleton {
+        height: 105px;
+        background: linear-gradient(100deg, #090909, #151515, #090909);
+        background-size: 200% 100%;
+        animation: shimmer 2s infinite;
+      }
+      @keyframes shimmer {
+        to {
+          background-position: -200% 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *:before {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+      @media (min-width: 1500px) {
+        main {
+          padding-top: 48px;
+        }
+      }
+      @media (max-width: 1000px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .card {
+          padding: 20px 16px;
+        }
+        .number {
+          font-size: 28px;
+        }
+        .card:before {
+          display: none;
+        }
+        .actions .status-chip {
+          display: none;
+        }
+      }
+      @media (max-width: 640px) {
+        .topbar {
+          height: 60px;
+          padding: 0 18px;
+        }
+        .workspace {
+          gap: 10px;
+        }
+        .account > span,
+        .plan {
+          display: none;
+        }
+        .tabs {
+          padding: 0 18px;
+          gap: 24px;
+        }
+        .tab {
+          padding-top: 14px;
+          font-size: 12px;
+        }
+        main {
+          padding: 26px 16px 0;
+        }
+        .page-heading {
+          align-items: flex-start;
+          gap: 12px;
+        }
+        h1 {
+          font-size: 25px;
+        }
+        .eyebrow {
+          font-size: 9px;
+        }
+        .actions {
+          padding-top: 25px;
+        }
+        .primary {
+          padding: 7px 10px;
+          font-size: 11px;
+        }
+        .cards {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .card {
+          border-bottom: 1px solid var(--border);
+        }
+        .card:nth-child(2n) {
+          border-inline-end: 0;
+        }
+        .card:last-child {
+          grid-column: 1/-1;
+        }
+        .card small {
+          font-size: 11px;
+        }
+        .number {
+          font-size: 28px;
+          margin-top: 10px;
+        }
+        .section-head,
+        .section-body {
+          padding: 17px;
+        }
+        .section-label {
+          font-size: 9px;
+        }
+        .table-tools {
+          padding: 15px;
+          gap: 8px;
+        }
+        .table-tools .table-summary {
+          display: none;
+        }
+        .pagination {
+          padding: 12px 15px;
+        }
+        .hint {
+          padding: 17px;
+          gap: 12px;
+        }
+        .hint p {
+          font-size: 11px;
+        }
+        .footer {
+          flex-direction: column;
+          gap: 12px;
+        }
+        th,
+        td {
+          padding: 12px 15px;
+        }
+        .status-line {
+          font-size: 11px;
+          padding: 10px 12px;
+        }
+        .section-note {
+          padding: 12px 17px;
+        }
+        .subheading {
+          font-size: 12px;
+        }
+        .brand {
+          font-size: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="workspace">
+        <a class="mark" href="#overview" aria-label="SceneLingo home">S</a
+        ><span class="slash">/</span
+        ><span class="brand" dir="ltr">SceneLingo</span
+        ><span class="plan">لوحة الإدارة</span>
+      </div>
+      <div class="account">
+        <span>مساحة عمل خاصة</span><span class="tag" dir="ltr">Production</span>
+        <div class="avatar" aria-label="المسؤول">S</div>
+      </div>
+    </header>
+    <div class="nav-wrap">
+      <nav class="tabs" role="tablist" aria-label="أقسام لوحة الإدارة">
+        <button
+          class="tab"
+          role="tab"
+          data-view="overview"
+          aria-selected="true"
+        >
+          نظرة عامة</button
+        ><button
+          class="tab"
+          role="tab"
+          data-view="subscribers"
+          aria-selected="false"
+        >
+          المشتركون</button
+        ><button
+          class="tab"
+          role="tab"
+          data-view="activity"
+          aria-selected="false"
+        >
+          التشغيل والسجلات</button
+        ><button
+          class="tab"
+          role="tab"
+          data-view="library"
+          aria-selected="false"
+        >
+          المحتوى والاستخدام
+        </button>
+      </nav>
+    </div>
+    <main>
+      <div class="page-heading">
+        <div>
+          <div class="eyebrow" dir="ltr">SCENELINGO / CONTROL CENTER</div>
+          <h1 id="page-title">نظرة عامة</h1>
+          <p class="subheading" id="page-description">
+            صورة واضحة لكل ما يحدث، من أول تعبير لآخر رسالة.
+          </p>
+          <div id="updated" aria-live="polite">جارٍ تحميل البيانات…</div>
+        </div>
+        <div class="actions">
+          <span class="status-chip"><i></i>بيانات عند الطلب</span
+          ><button class="primary" id="refresh">تحديث البيانات ↻</button>
+        </div>
+      </div>
+      <div id="error" role="alert" hidden></div>
+      <div class="status-line">
+        <span class="status-icon" aria-hidden="true">i</span>
+        <p id="scheduler-health" role="status">جارٍ فحص آخر سجل تشغيل…</p>
+      </div>
+      <div data-panels="overview">
+        <div class="cards" id="cards">
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+        </div>
+        <div class="hint">
+          <div class="hint-icon" aria-hidden="true">↗</div>
+          <div>
+            <strong>محتوى واحد. مواعيد مختلفة. تشغيل أذكى.</strong>
+            <p id="demand">جارٍ حساب الطلب الحالي…</p>
+            <p>
+              كل مشترك يأخذ أقدم درس مناسب لم يصله، والشرح يُجهّز فقط للغات
+              المطلوبة. أقل فترة نصف ساعة.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div data-panels="overview library">
+        <p class="metric-caption">التسليم والمحتوى · إجمالي السجلات المتاحة</p>
+        <div class="cards" id="delivery"></div>
+      </div>
+      <div class="grid" data-panels="overview">
+        <section>
+          <div class="section-head">
+            <div>
+              <h2>توزيع الاشتراكات</h2>
+              <p>اللغات والمستويات والمواعيد التي عليها طلب فعلي.</p>
+            </div>
+            <span class="section-label">AUDIENCE</span>
+          </div>
+          <div class="scroll" id="groups"></div>
+        </section>
+        <section>
+          <div class="section-head">
+            <div>
+              <h2>آخر التعبيرات</h2>
+              <p>المحتوى المسجّل في سجل الإرسال.</p>
+            </div>
+            <span class="section-label">RECENT CONTENT</span>
+          </div>
+          <div class="scroll" id="recent"></div>
+        </section>
+      </div>
+      <section data-panels="subscribers">
+        <div class="section-head">
+          <div>
+            <h2>دليل المشتركين</h2>
+            <p>الهوية، الإعدادات وحالة التسليم في مكان واحد.</p>
+          </div>
+          <span class="tag"><span class="lock">⌑</span> خاص</span>
+        </div>
+        <div class="table-tools">
+          <div class="search-box">
+            <span aria-hidden="true">⌕</span
+            ><input
+              id="subscriber-search"
+              aria-label="بحث المشتركين"
+              placeholder="بحث بالاسم، Username أو Telegram ID…"
+              maxlength="100"
+            />
+          </div>
+          <button class="secondary" id="subscriber-find">بحث</button
+          ><span class="table-summary">50 مستخدمًا في الصفحة · عرض فقط</span>
+        </div>
+        <div
+          class="scroll"
+          id="subscribers"
+          tabindex="0"
+          aria-label="جدول المشتركين؛ مرّر أفقيًا لعرض التفاصيل"
+        ></div>
+        <div class="pagination">
+          <button class="secondary" id="subscriber-prev">السابق</button
+          ><span id="subscriber-page"></span
+          ><button class="secondary" id="subscriber-next">التالي</button>
+        </div>
+        <div class="section-note">
+          البيانات التي أتاحها المستخدم للبوت فقط. قد لا يوجد Username، والاسم
+          المحفوظ قد يكون قديمًا حتى يعيد المستخدم /start.
+        </div>
+      </section>
+      <section data-panels="activity">
+        <div class="section-head">
+          <div>
+            <h2>سجل التشغيل</h2>
+            <p>آخر 30 تشغيلًا مع نتائج التسليم ومدة التنفيذ.</p>
+          </div>
+          <span class="section-label">EXECUTION LOG</span>
+        </div>
+        <div class="scroll" id="runs"></div>
+        <div class="section-note">
+          العدادات التفصيلية تبدأ من تحديث القياس. قد تعرض العمليات الأقدم
+          صفرًا. التشغيل اليدوي ليس إثباتًا لانتظام الجدولة.
+        </div>
+      </section>
+      <section data-panels="activity">
+        <div class="section-head">
+          <div>
+            <h2>أخطاء التسليم</h2>
+            <p>أحدث النتائج التي تحتاج انتباهك.</p>
+          </div>
+          <span class="section-label">DELIVERY ERRORS</span>
+        </div>
+        <div class="scroll" id="errors"></div>
+        <div class="section-note">
+          uncertain تعني أن النتيجة غير مؤكدة؛ لا يُعاد إرسال الدفعة تلقائيًا.
+          أخطاء ما قبل الإرسال موجودة في سجل GitHub.
+        </div>
+      </section>
+      <section data-panels="library">
+        <div class="section-head">
+          <div>
+            <h2>التجهيز المبكر</h2>
+            <p>المحتوى الجاهز وحالة المخزن المؤقت.</p>
+          </div>
+          <span class="section-label">PREPARATION</span>
+        </div>
+        <div class="section-body"><p id="preparation" class="muted"></p></div>
+        <div class="scroll" id="preparation-runs"></div>
+        <div class="section-note">
+          جاهز: مرتبط بالموعد والإعدادات الحالية، ولم يُسجل كمرسل أو غير مؤكد.
+          التخزين لا يشمل نسخ قاعدة البيانات الاحتياطية.
+        </div>
+      </section>
+      <section data-panels="library">
+        <div class="section-head">
+          <div>
+            <h2>استخدام الذكاء الاصطناعي</h2>
+            <p>استهلاك مُقاس، بدون تقديرات مالية.</p>
+          </div>
+          <span class="section-label">AI USAGE</span>
+        </div>
+        <div class="section-body"><p id="ai" class="ai-summary"></p></div>
+        <div class="section-note">
+          التوكنز التي أبلغ عنها المزود فقط. طلبات الصوت قد لا تبلغ توكنز، ولا
+          تُقاس محاولات SDK الداخلية منفردة.
+        </div>
+      </section>
+      <footer class="footer">
+        <div class="footer-brand" dir="ltr">
+          SceneLingo <span style="color: #444">/</span> Administration
+        </div>
+        <p>
+          بيانات البوت الحالي فقط. فتح اللوحة لا يشغّل إرسالًا أو طلبات AI.
+          بيانات المشتركين خاصة بالإدارة؛ لا تشارك بيانات الدخول أو صور اللوحة
+          علنًا.
+        </p>
+        <span class="tag">Read-only</span>
+      </footer>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let subscriberPage = 1,
+        subscriberSearch = "",
+        loading = false;
+      const languages = {
+        en: "الإنجليزية",
+        ar: "العربية",
+        es: "الإسبانية",
+        fr: "الفرنسية",
+        zh: "الصينية",
+        hi: "الهندية",
+        pt: "البرتغالية",
+        ru: "الروسية",
+        de: "الألمانية",
+        ja: "اليابانية",
+      };
+      const date = (value) =>
+        value ? new Date(value).toLocaleString("ar-EG") : "—";
+      const interval = (n) =>
+        n === 30
+          ? "نص ساعة"
+          : n === 60
+            ? "ساعة"
+            : n === 120
+              ? "ساعتين"
+              : n === 720
+                ? "١٢ ساعة"
+                : n === 1440
+                  ? "٢٤ ساعة"
+                  : n % 60 === 0
+                    ? `${n / 60} ساعات`
+                    : `${n} دقيقة`;
+      function table(id, headers, rows) {
+        const root = $(id);
+        root.replaceChildren();
+        if (!rows.length) {
+          const p = document.createElement("p");
+          p.className = "empty";
+          p.textContent = "لا توجد بيانات لعرضها بعد.";
+          root.append(p);
+          return;
+        }
+        const t = document.createElement("table"),
+          head = document.createElement("thead"),
+          tr = document.createElement("tr");
+        for (const h of headers) {
+          const th = document.createElement("th");
+          th.textContent = h;
+          tr.append(th);
+        }
+        head.append(tr);
+        t.append(head);
+        const body = document.createElement("tbody");
+        for (const row of rows) {
+          const tr = document.createElement("tr");
+          for (const value of row) {
+            const td = document.createElement("td");
+            td.className = "long";
+            const badges = {
+              فعال: "success",
+              اكتمل: "success",
+              sent: "success",
+              متوقف: "warning",
+              "يكمل الإعداد": "warning",
+              uncertain: "warning",
+              failed: "danger",
+              blocked: "danger",
+              "فشل — راجع سجل التشغيل في GitHub": "danger",
+            };
+            if (Object.hasOwn(badges, value)) {
+              const badge = document.createElement("span");
+              badge.className = "badge " + badges[value];
+              badge.textContent = value;
+              td.append(badge);
+            } else {
+              td.textContent = value ?? "—";
+            }
+            tr.append(td);
+          }
+          body.append(tr);
+        }
+        t.append(body);
+        root.append(t);
+      }
+      async function load() {
+        if (loading) return;
+        loading = true;
+        const button = $("refresh");
+        button.disabled = true;
+        $("error").hidden = true;
+        try {
+          const response = await fetch(
+            "/api/dashboard?data=1&page=" +
+              subscriberPage +
+              "&search=" +
+              encodeURIComponent(subscriberSearch),
+            { cache: "no-store" },
+          );
+          if (!response.ok)
+            throw new Error(
+              "تعذر تحميل البيانات. تأكد من تسجيل الدخول وحاول تاني.",
+            );
+          const data = await response.json();
+          $("cards").replaceChildren();
+          for (const [key, title] of [
+            ["total", "إجمالي المشتركين"],
+            ["active", "اشتراكات فعّالة"],
+            ["setup", "بيكمّلوا الإعدادات"],
+            ["stopped", "أوقفوا الاشتراك"],
+            ["due", "مستحقين دلوقتي"],
+          ]) {
+            const card = document.createElement("div");
+            card.className = "card";
+            const small = document.createElement("small"),
+              number = document.createElement("div");
+            small.textContent = title;
+            number.className = "number";
+            number.textContent = data[key].toLocaleString("ar-EG");
+            card.append(small, number);
+            $("cards").append(card);
+          }
+          $("demand").textContent = data.due
+            ? `${data.due} مشترك مستحق للإرسال. هيتم فحص الاستحقاق تاني قبل تجهيز المحتوى والإرسال.`
+            : "مفيش مشترك مستحق دلوقتي؛ مفيش تجهيز محتوى أو طلبات AI مطلوبة.";
+          $("updated").textContent =
+            `آخر تحديث: ${date(data.updated_at)} · أقرب استحقاق: ${date(data.next_due)}`;
+          table(
+            "groups",
+            ["التعلّم", "الشرح", "المستوى", "كل", "مشتركين", "مستحقين"],
+            data.groups.map((g) => [
+              languages[g.learning] || g.learning,
+              languages[g.explanation] || g.explanation,
+              g.level,
+              interval(g.minutes),
+              g.subscribers,
+              g.due,
+            ]),
+          );
+          const people = data.subscribers || {
+            rows: [],
+            page: 1,
+            page_size: 50,
+            total: 0,
+          };
+          table(
+            "subscribers",
+            [
+              "Telegram ID",
+              "Username",
+              "الاسم",
+              "الحالة",
+              "لغة القوائم",
+              "التعلّم",
+              "المستوى",
+              "الشرح",
+              "كل",
+              "تاريخ الاشتراك",
+              "آخر تعديل للإعدادات",
+              "الاستحقاق القادم",
+              "آخر نتيجة",
+              "آخر خطأ",
+              "وقت آخر محاولة",
+              "آخر تعبير",
+            ],
+            people.rows.map((u) => [
+              u.chat_id,
+              u.username ? "@" + u.username : "—",
+              u.first_name || "—",
+              !u.is_active
+                ? "متوقف"
+                : u.input_state?.startsWith("setup_")
+                  ? "يكمل الإعداد"
+                  : "فعال",
+              languages[u.ui_language] || u.ui_language,
+              languages[u.learning_language] || u.learning_language,
+              u.level,
+              languages[u.explanation_language] || u.explanation_language,
+              interval(u.interval_minutes),
+              date(u.subscribed_at),
+              date(u.updated_at),
+              date(u.next_due_at),
+              u.last_status,
+              u.last_error,
+              date(u.last_delivery_at),
+              u.last_phrase,
+            ]),
+          );
+          $("subscriber-page").textContent =
+            `صفحة ${people.page} · ${people.total} مشترك مطابق`;
+          $("subscriber-prev").disabled = people.page <= 1;
+          $("subscriber-next").disabled =
+            people.page * people.page_size >= people.total;
+          const latest = data.runs?.[0]?.finished_at;
+          const age = latest
+            ? (Date.now() - new Date(latest).getTime()) / 60000
+            : null;
+          $("scheduler-health").textContent =
+            age === null
+              ? "لا يوجد سجل تشغيل بعد."
+              : age > 30
+                ? "تنبيه: آخر سجل تشغيل أقدم من ٣٠ دقيقة. افحص GitHub والكرون."
+                : "يوجد سجل تشغيل خلال آخر ٣٠ دقيقة؛ قد يكون يدويًا أو تلقائيًا.";
+          const statuses = {
+            idle: "بدون طلب",
+            completed: "اكتمل",
+            failed: "فشل — راجع سجل التشغيل في GitHub",
+          };
+          table(
+            "runs",
+            [
+              "النتيجة",
+              "المستحقون",
+              "وصلت",
+              "فشلت",
+              "غير مؤكدة",
+              "متخطاة",
+              "ثانية",
+              "الوقت",
+            ],
+            data.runs.map((r) => [
+              statuses[r.status] || r.status,
+              r.due_count,
+              r.sent_count ?? 0,
+              r.failed_count ?? 0,
+              r.uncertain_count ?? 0,
+              r.skipped_count ?? 0,
+              Math.round(r.duration_seconds ?? 0),
+              date(r.finished_at),
+            ]),
+          );
+          const prep = data.preparation || {};
+          $("preparation").textContent =
+            `جاهز للإرسال: ${prep.ready ?? 0} · مقاطع مخزنة: ${prep.media_items ?? 0} · التخزين: ${((prep.media_bytes ?? 0) / 1048576).toFixed(1)} MiB من حد التطبيق 80 MiB`;
+          table(
+            "preparation-runs",
+            ["تجهزت", "فشلت", "ثانية", "الوقت"],
+            (prep.runs || []).map((r) => [
+              r.prepared_count,
+              r.failed_count,
+              Math.round(r.duration_seconds),
+              date(r.finished_at),
+            ]),
+          );
+          const detail = data.delivery || {};
+          $("delivery").replaceChildren();
+          for (const [key, label] of [
+            ["sent", "إرسال ناجح مسجل"],
+            ["uncertain", "نتيجة غير مؤكدة"],
+            ["cached", "مقاطع قابلة لإعادة الاستخدام"],
+            ["saved", "تعبيرات محفوظة"],
+            ["reports", "بلاغات جودة"],
+          ]) {
+            const c = document.createElement("div");
+            c.className = "card";
+            const s = document.createElement("small"),
+              n = document.createElement("div");
+            s.textContent = label;
+            n.className = "number";
+            n.textContent = detail[key] ?? 0;
+            c.append(s, n);
+            $("delivery").append(c);
+          }
+          const ai = data.ai || {};
+          $("ai").textContent =
+            `استدعاءات: ${ai.requests ?? 0} · فاشلة: ${ai.failed ?? 0} · توكنز مدخلات: ${ai.prompt_tokens ?? 0} · مخرجات: ${ai.completion_tokens ?? 0} · بدون بيانات توكنز: ${ai.unreported ?? 0}`;
+          table(
+            "errors",
+            ["الحالة", "السبب", "الوقت"],
+            (detail.errors || []).map((e) => [
+              e.status,
+              e.error_code,
+              date(e.updated_at),
+            ]),
+          );
+          table(
+            "recent",
+            ["التعبير", "المستوى", "اللغة", "الفيلم", "وقت الإرسال"],
+            data.recent.map((r) => [
+              r.phrase,
+              r.level,
+              languages[r.learning_language] || r.learning_language,
+              r.video_title,
+              date(r.sent_at),
+            ]),
+          );
+        } catch (error) {
+          $("error").textContent = error.message;
+          $("error").hidden = false;
+          $("updated").textContent =
+            "تعذر التحديث — أي بيانات ظاهرة تخص آخر تحميل ناجح.";
+        } finally {
+          button.disabled = false;
+          loading = false;
+        }
+      }
+      $("refresh").addEventListener("click", load);
+      $("subscriber-find").addEventListener("click", () => {
+        if (loading) return;
+        subscriberPage = 1;
+        subscriberSearch = $("subscriber-search").value;
+        load();
+      });
+      $("subscriber-prev").addEventListener("click", () => {
+        if (!loading && subscriberPage > 1) {
+          subscriberPage--;
+          load();
+        }
+      });
+      $("subscriber-next").addEventListener("click", () => {
+        if (!loading) {
+          subscriberPage++;
+          load();
+        }
+      });
+      $("subscriber-search").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") $("subscriber-find").click();
+      });
+      load();
+
+      const views = {
+        overview: [
+          "نظرة عامة",
+          "صورة واضحة لكل ما يحدث، من أول تعبير لآخر رسالة.",
+        ],
+        subscribers: [
+          "المشتركون",
+          "كل مشترك، إعداداته، وآخر نتيجة إرسال. بيانات خاصة بالإدارة.",
+        ],
+        activity: [
+          "التشغيل والسجلات",
+          "تتبّع التشغيل، راجع النتائج واعرف أين يحتاج النظام انتباهك.",
+        ],
+        library: [
+          "المحتوى والاستخدام",
+          "مكتبة مشتركة، تجهيز مبكر واستخدام محسوب للذكاء الاصطناعي.",
+        ],
+      };
+      function selectView(view, updateHash = false) {
+        if (!Object.hasOwn(views, view)) view = "overview";
+        document.querySelectorAll("[data-panels]").forEach((el) => {
+          el.classList.toggle(
+            "panel-hidden",
+            !el.dataset.panels.split(" ").includes(view),
+          );
+        });
+        document.querySelectorAll("[data-view]").forEach((el) => {
+          const selected = el.dataset.view === view;
+          el.setAttribute("aria-selected", String(selected));
+          el.tabIndex = selected ? 0 : -1;
+        });
+        $("page-title").textContent = views[view][0];
+        $("page-description").textContent = views[view][1];
+        if (updateHash) history.replaceState(null, "", "#" + view);
+      }
+      document.querySelectorAll("[data-view]").forEach((button, index) => {
+        button.addEventListener("click", () =>
+          selectView(button.dataset.view, true),
+        );
+        button.addEventListener("keydown", (event) => {
+          const tabs = [...document.querySelectorAll("[data-view]")];
+          let next;
+          if (event.key === "ArrowLeft") next = (index + 1) % tabs.length;
+          else if (event.key === "ArrowRight")
+            next = (index + tabs.length - 1) % tabs.length;
+          else if (event.key === "Home") next = 0;
+          else if (event.key === "End") next = tabs.length - 1;
+          else return;
+          event.preventDefault();
+          tabs[next].focus();
+          selectView(tabs[next].dataset.view, true);
+        });
+      });
+      window.addEventListener("hashchange", () =>
+        selectView(location.hash.slice(1)),
+      );
+      selectView(location.hash.slice(1));
+    </script>
+  </body>
+</html>
