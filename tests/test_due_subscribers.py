@@ -19,6 +19,7 @@ def test_due_query_excludes_inactive_and_uses_database_time(monkeypatch):
     assert db.due_subscribers() == [{'chat_id': 1, 'level': 'A2'}]
     sql = cur.execute.call_args.args[0]
     assert 's.is_active = TRUE' in sql
+    assert "COALESCE(p.input_state, '') NOT LIKE 'setup_%'" in sql
     assert '<= now()' in sql
 
 
@@ -46,6 +47,7 @@ def test_preflight_checks_current_level_preferences_and_due_time(monkeypatch):
     assert db.still_due_with_settings(user)
     sql, params = cur.execute.call_args.args
     assert 's.is_active = TRUE' in sql and 's.level = %s' in sql
+    assert "LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'" in sql
     assert 'IS NOT DISTINCT FROM' in sql and '<= now()' in sql
     assert params == (1, 'B1', 'ja', 'ar', 'v')
 
