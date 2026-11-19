@@ -74,3 +74,24 @@ test('dashboard preparation aggregates execute in PostgreSQL', async()=>{
   assert.equal(result.rows[0].media_bytes,0);
  } finally {await db.close();}
 });
+
+test('shared library assigns oldest unseen lesson per person, not per interval cohort',async()=>{
+ const db=new PGlite();
+ try {
+  for(const file of ['schema.sql','scheduling.sql','reliability.sql'])await db.exec(read(file));
+  await db.exec("INSERT INTO subscribers(chat_id) VALUES(1),(2); INSERT INTO lesson_content(content_key,phrase,topic,level,learning_language,clip_id,video_title,source_url,telegram_file_id) VALUES('one','one','t','B1','en','1','Film','https://example.com','file1'),('two','two','t','B1','en','2','Film','https://example.com','file2'),('foreign','foreign','t','B1','fr','3','Film','https://example.com','file3'); INSERT INTO delivery_attempts(chat_id,due_at,content_id,status) VALUES(1,now(),1,'sent');");
+  let i=0;
+  const query=read('delivery_store.py').match(/cur.execute\("""(SELECT recipient.chat_id[\s\S]*?)"""/)[1].replace(/%s/g,()=>'$'+(++i));
+  let result=await db.query(query,[[1,2],'B1','en']);
+  const map=Object.fromEntries(result.rows.map(r=>[r.chat_id,r.id]));
+  assert.equal(map[1],2); // fast subscriber already saw lesson 1
+  assert.equal(map[2],1); // slower subscriber gets lesson 1, not a fresh generation
+  await db.exec("INSERT INTO delivery_attempts(chat_id,due_at,content_id,status) VALUES(2,now()+interval '1 minute',1,'uncertain');");
+  result=await db.query(query,[[2],'B1','en']);assert.equal(result.rows[0].id,2);
+  result=await db.query(query,[[2],'C2','en']);assert.equal(result.rows[0].id,null);
+  await db.exec("UPDATE lesson_content SET telegram_file_id=NULL WHERE id=2; INSERT INTO prepared_media(content_id,payload) VALUES(2,'\\x01');");
+  result=await db.query(query,[[2],'B1','en']);assert.equal(result.rows[0].id,2);
+  await db.exec("UPDATE prepared_media SET expires_at=now()-interval '1 minute';");
+  result=await db.query(query,[[2],'B1','en']);assert.equal(result.rows[0].id,null);
+ }finally{await db.close();}
+});

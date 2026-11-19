@@ -107,3 +107,32 @@ def seen_by(content_id, chat_ids):
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute("SELECT 1 FROM delivery_attempts WHERE content_id=%s AND chat_id=ANY(%s) AND status IN ('sent','uncertain','sending') LIMIT 1", (content_id,chat_ids))
         return cur.fetchone() is not None
+
+
+def assign_cached(subscribers):
+    """Oldest unseen reusable lesson per person, independent of delivery interval.
+
+    One query per language/level, not one query per subscriber. Receipts, not a
+    group-wide history, decide whether each person has already received a lesson.
+    """
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for sub in subscribers:
+        groups[(sub['level'], sub['learning_language'])].append(sub)
+    assigned = {}
+    for (level, learning), audience in groups.items():
+        with db.connect() as conn, conn.cursor() as cur:
+            cur.execute("""SELECT recipient.chat_id, chosen.id
+                FROM unnest(%s::bigint[]) AS recipient(chat_id)
+                LEFT JOIN LATERAL (
+                    SELECT c.id FROM lesson_content c
+                    WHERE c.level=%s AND c.learning_language=%s
+                      AND (c.telegram_file_id IS NOT NULL OR EXISTS (
+                        SELECT 1 FROM prepared_media m WHERE m.content_id=c.id AND m.expires_at>now()))
+                      AND NOT EXISTS (SELECT 1 FROM delivery_attempts a
+                        WHERE a.chat_id=recipient.chat_id AND a.content_id=c.id
+                          AND a.status IN ('sent','uncertain','sending'))
+                    ORDER BY c.created_at,c.id LIMIT 1
+                ) chosen ON TRUE""", ([s['chat_id'] for s in audience], level, learning))
+            assigned.update(cur.fetchall())
+    return [dict(sub, queue_content_id=assigned.get(sub['chat_id'])) for sub in subscribers]

@@ -68,9 +68,9 @@ def reserve(sub, content_id):
 def _prepare(subscribers, select, explain):
     """Retry missing preparation next tick; never mark a partial lesson ready."""
     groups = defaultdict(list)
-    for sub in subscribers:
+    for sub in store.assign_cached(subscribers):
         if db.still_due_with_settings(sub, 10) and not ready(sub) and not store.state(sub):
-            groups[(sub['level'],sub['learning_language'],ready(sub, require_caption=False))].append(sub)
+            groups[(sub['level'],sub['learning_language'],ready(sub, require_caption=False) or sub.get('queue_content_id'))].append(sub)
     prepared = failed = 0
     for (level, learning, pinned), audience in groups.items():
         try:
