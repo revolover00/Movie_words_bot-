@@ -58,5 +58,5 @@ def test_advance_changed_settings_only_when_current_schedule_is_overdue(monkeypa
     assert db.advance_due_after_delivery(42, 'old-version')
     first, fallback = [call.args[0] for call in cur.execute.call_args_list]
     assert 'p.updated_at = %s' in first
-    assert "p.interval_minutes * interval '1 minute'" in fallback
+    assert "next_delivery_at(p.interval_minutes)" in fallback
     assert "<= now()" in fallback

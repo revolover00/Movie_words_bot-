@@ -1,5 +1,7 @@
 // Telegram webhook: subscribe, change CEFR level, and see the latest expression.
 import pg from 'pg';
+import { readFileSync } from 'node:fs';
+const scheduleSql = readFileSync(new URL('../scheduling.sql', import.meta.url), 'utf8');
 import { text, intervalLabel, validInterval, intervalKeyboard, levelKeyboard, uiKeyboard, UI_LANGUAGES } from '../bot_ui.js';
 
 const { Client } = pg;
@@ -69,7 +71,7 @@ async function setupChoice(client, chatId, kind, value) {
       await client.query(`UPDATE subscriber_preferences SET ${column} = $1 WHERE chat_id = $2`, [settings[column], chatId]);
     }
     await client.query(`UPDATE subscriber_preferences SET input_state = $1, updated_at = now(),
-      next_due_at = CASE WHEN $1::text IS NULL THEN now() + interval_minutes * interval '1 minute' ELSE next_due_at END
+      next_due_at = CASE WHEN $1::text IS NULL THEN next_delivery_at(interval_minutes) ELSE next_due_at END
       WHERE chat_id = $2`, [next, chatId]);
     await client.query('COMMIT');
     return { state: next, settings };
@@ -123,6 +125,7 @@ ALTER TABLE subscriber_preferences ADD CONSTRAINT subscriber_preferences_interva
     CHECK (interval_minutes BETWEEN 30 AND 1440);
       END IF;
     END $$`);
+    await client.query(scheduleSql);
     return await fn(client);
   } finally {
     await client.end();
@@ -178,7 +181,7 @@ export default async function handler(req, res) {
         await telegram('answerCallbackQuery', { callback_query_id: callback.id });
         if (result.missing) await renderMessage(chat.id, text(lang, 'missing'), undefined, messageId);
         else if (result.state) await setupPrompt(chat.id, result.state, result.settings, lang, messageId);
-        else await renderMessage(chat.id, text(lang, 'done', { interval: intervalLabel(result.settings.interval_minutes, lang) }), undefined, messageId);
+        else await renderMessage(chat.id, text(lang, result.settings.interval_minutes === 30 ? 'done_halfhour' : 'done', { interval: intervalLabel(result.settings.interval_minutes, lang) }), undefined, messageId);
         return res.status(200).send('ok');
       }
       const result = await withDb(async client => {
@@ -191,7 +194,7 @@ export default async function handler(req, res) {
           SELECT chat_id, $1, subscribed_at + interval '3 hours' FROM subscribers WHERE chat_id = $2 AND is_active = TRUE
           ON CONFLICT (chat_id) DO UPDATE SET ui_language = EXCLUDED.ui_language, updated_at = now() RETURNING chat_id`, [value, chat.id]);
         if (kind === 'interval') return client.query(`UPDATE subscriber_preferences p SET interval_minutes = $1,
-          next_due_at = now() + ($1 * interval '1 minute'), input_state = NULL, updated_at = now()
+          next_due_at = next_delivery_at($1::integer), input_state = NULL, updated_at = now()
           FROM subscribers s WHERE p.chat_id = $2 AND s.chat_id = p.chat_id AND s.is_active = TRUE RETURNING p.chat_id`, [Number(value), chat.id]);
         if (kind === 'level') return client.query(
           'UPDATE subscribers SET level = $1 WHERE chat_id = $2 AND is_active = TRUE RETURNING level', [value, chat.id]);
@@ -209,7 +212,7 @@ export default async function handler(req, res) {
       }
       const displayValue = kind === 'interval' ? intervalLabel(value, lang) : label(value);
       await renderMessage(chat.id, result.rowCount
-        ? text(kind === 'ui' ? value : lang, `saved_${kind}`, { value: displayValue })
+        ? text(kind === 'ui' ? value : lang, kind === 'interval' && value === '30' ? 'saved_interval_halfhour' : `saved_${kind}`, { value: displayValue })
         : text(lang, 'subscribe'), undefined, messageId);
       return res.status(200).send('ok');
     }
