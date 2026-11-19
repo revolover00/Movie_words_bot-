@@ -8,6 +8,7 @@ Tables:
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 import psycopg2
@@ -43,6 +44,7 @@ def init_db() -> None:
     with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(ddl)
+            cur.execute(Path(__file__).with_name('scheduling.sql').read_text(encoding='utf-8'))
         conn.commit()
     log.info("Database initialized")
 
@@ -193,7 +195,7 @@ def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:
         else:
             cur.execute("""
                 UPDATE subscriber_preferences p
-                SET next_due_at = now() + p.interval_minutes * interval '1 minute'
+                SET next_due_at = next_delivery_at(p.interval_minutes)
                 FROM subscribers s
                 WHERE p.chat_id = %s AND s.chat_id = p.chat_id AND s.is_active = TRUE
                   AND p.updated_at = %s
@@ -203,7 +205,7 @@ def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:
             return True
         cur.execute("""
             UPDATE subscriber_preferences p
-            SET next_due_at = now() + p.interval_minutes * interval '1 minute'
+            SET next_due_at = next_delivery_at(p.interval_minutes)
             FROM subscribers s
             WHERE p.chat_id = %s AND s.chat_id = p.chat_id AND s.is_active = TRUE
               AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()

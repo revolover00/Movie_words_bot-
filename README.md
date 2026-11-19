@@ -221,3 +221,17 @@ Presentation limits count UTF-16 units, including emoji, and omit a source link
 when it cannot fit rather than cutting the expression or lesson block in half.
 This uses one explanation request per requested explanation-language cohort,
 not one request per subscriber, with no additional generation on idle runs.
+
+### Half-hour clock slots
+
+The 30-minute option is due at each :00 and :30 boundary, starting at the next
+strictly future slot, rather than 30 minutes after subscription or delivery.
+Both the webhook and worker load `scheduling.sql` for the same SQL function.
+Longer intervals retain elapsed-time scheduling. Future unaligned 30-minute
+preferences are migrated; already-overdue work remains due. Manual send-now
+is an explicit override, and the following automatic due time uses clock slots.
+The external cron should run at minutes `0,30` (`0,30 * * * *`), not just at a
+30-minute offset from when the cron was created. Queueing and clip preparation
+can delay actual delivery. No catch-up burst is sent after missed slots.
+When initializing the database manually, apply `schema.sql` then `scheduling.sql`
+in the bot's isolated schema; `db.init_db()` does both automatically.
