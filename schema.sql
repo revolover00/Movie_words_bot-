@@ -1,4 +1,4 @@
--- Movie Word Bot schema (Neon Postgres)
+-- SceneLingo schema (Neon Postgres)
 -- Run once in the Neon SQL editor or via: python -m db init
 
 CREATE TABLE IF NOT EXISTS subscribers (

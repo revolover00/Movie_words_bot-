@@ -1,15 +1,15 @@
-# Movie Word Bot 🎬
+# SceneLingo 🎬
 
 A free, open-source Telegram bot for useful expressions with matching short movie clips and explanations. Subscribers choose a CEFR level, learning language, explanation language and delivery interval inside Telegram.
 
 > Learn languages by watching movies — expressions for your level, zero self-hosting.
 
-> **Multilingual rollout is experimental.** Clip availability varies by language, automatic audio verification is imperfect, and free-tier rate limits and worker duration can delay or prevent delivery. The scheduler is not exactly-once; failures between a Telegram send and the database update can cause duplicates. Test your setup before enabling production delivery.
+> **Multilingual rollout is experimental.** Clip availability varies by language, automatic audio verification is imperfect, and free-tier rate limits and worker duration can delay or prevent delivery. Telegram has no send idempotency key. Durable per-slot claims prevent blind replay; interrupted or timed-out sends are marked uncertain, so delivery is not guaranteed exactly once. Test your setup before enabling production delivery.
 
 ## How it works
 
 ```
-cron-job.org (every 2 minutes)
+cron-job.org (at :00 and :30)
     │  POST → GitHub API (repository_dispatch)
     ▼
 GitHub Actions (free ephemeral runner)
@@ -112,7 +112,7 @@ python daily_job.py  # sends to subscribers whose delivery time is due
 
 ### 8. Schedule via cron-job.org
 
-Create a free job on [cron-job.org](https://cron-job.org) scheduled every 2 minutes that POSTs to:
+Create a free job on [cron-job.org](https://cron-job.org) scheduled at minutes 0 and 30 each hour that POSTs to:
 
 ```
 https://api.github.com/repos/<OWNER>/<REPO>/dispatches
@@ -196,7 +196,7 @@ of a strong random password in the sensitive production variable
 configuration fails closed. All data responses use `private, no-store`. The dashboard
 is read-only: opening it cannot trigger content generation or broadcasts. It shows
 aggregate counts, active language/level/interval cohorts, due counts, recent expressions,
-and the last 30 coarse scheduler outcomes. No subscriber IDs or names are returned.
+and the last 30 scheduler outcomes with counters for newly recorded runs. No subscriber IDs or names are returned.
 
 Run history starts with this release. `completed` is a run outcome, not a delivery
 count, token usage figure, or guarantee of delivery. Details of errors remain in
@@ -235,3 +235,53 @@ The external cron should run at minutes `0,30` (`0,30 * * * *`), not just at a
 can delay actual delivery. No catch-up burst is sent after missed slots.
 When initializing the database manually, apply `schema.sql` then `scheduling.sql`
 in the bot's isolated schema; `db.init_db()` does both automatically.
+
+
+## Reliable SceneLingo delivery
+
+Production now uses `reliable_delivery.py`, backed by bot-local tables from
+`reliability.sql` (loaded automatically by Python initialization and the webhook).
+The older `run_due_subscribers` helper remains for compatibility and tests; the
+production entry point uses the durable worker instead.
+
+- A session advisory lock prevents concurrent workers for the same bot.
+- A unique `(chat_id, due_at)` claim is committed before any Telegram upload.
+  Receipts are saved before schedules advance. A terminated worker's unresolved
+  claims become **uncertain**, never silently resent. Uncertain sends advance
+  the schedule conservatively on recovery. This can skip a delivery; it is not
+  an exactly-once guarantee, and uncertainty needs operator review.
+- Only explicit Telegram rate-limit refusals are retried (up to 3 calls, waits
+  capped at 60 seconds). Exhausted refusals cool down at least 15 minutes with
+  at most 3 slot claims. Network timeouts are ambiguous and are not auto-retried.
+  Blocked users are deactivated; permanent rejections advance the schedule.
+- Successfully uploaded verified clips are retained as bot-specific Telegram
+  `file_id` references, not binary files in Git or the database. Reusable captions
+  are stored by explanation language. Cache selection excludes content already
+  sent or potentially sent to any intended recipient. No level/language is
+  silently downgraded if verified content is unavailable. The cache grows only
+  through actual requested deliveries; this is NOT a prefilled content library.
+- The dashboard reports durable delivery states, classified send errors, cache
+  counts, saves, feedback, run counters and reported API token usage. API usage
+  counts SDK operations, not each internal HTTP retry; missing token counts are
+  null, not fabricated. No USD cost or quality guarantee is implied.
+- Below new clips: save the expression or report an unclear explanation/clip.
+  Only a recorded recipient may act on that lesson. `/saved` shows up to 10 saved
+  expressions; `/review` starts a self-assessed recall exercise. Remembered items
+  double their review spacing up to 30 days; difficult items return after one day.
+  Reviews are user-initiated, not unsolicited reminder broadcasts or AI grading.
+
+Display/package branding is **SceneLingo** (`scenelingo`). Existing GitHub repository
+URLs, the live `scenelingoo.vercel.app` domain and Telegram username are deliberately
+preserved so deployment, cron and existing links continue working. Renaming those
+external resources is a separate migration, not a text replacement.
+
+### Operator checklist
+
+Run `npm test` and `python -m pytest -q`, then initialize using the existing
+**Configure Telegram bot** workflow after deployment. The browser integration
+workflow checks private access, real database aggregates, rendering and mobile
+layout without broadcasting. For a real Telegram test, use an explicit manual
+send to opted-in recipients only. Monitor uncertain receipts and content failures;
+never bulk-reset claims to force retries. Historical commit messages on shared
+branches have not been rewritten. Copyright permissions and human review of
+content remain operator responsibilities.

@@ -20,7 +20,7 @@ test('dashboard fails closed for missing or incorrect credentials',async()=>{
 test('private dashboard serves HTML with no-store and restrictive CSP',async()=>{
  process.env.DASHBOARD_PASSWORD_HASH=hash;
  const res=response();await handler({method:'GET',headers:{authorization:auth}},res);
- assert.equal(res.code,200);assert.ok(res.body.includes('SceneLingoo'));assert.equal(res.headers['Cache-Control'],'private, no-store');assert.ok(res.headers['Content-Security-Policy'].includes("script-src 'sha256-"));assert.ok(!res.body.includes('test-password'));
+ assert.equal(res.code,200);assert.ok(res.body.includes('SceneLingo'));assert.equal(res.headers['Cache-Control'],'private, no-store');assert.ok(res.headers['Content-Security-Policy'].includes("script-src 'sha256-"));assert.ok(!res.body.includes('test-password'));
 });
 test('dashboard rejects write methods',async()=>{
  const res=response();await handler({method:'POST',headers:{authorization:auth}},res);assert.equal(res.code,405);

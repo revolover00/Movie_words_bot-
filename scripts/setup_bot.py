@@ -30,6 +30,19 @@ def main():
     expected = os.environ.get('EXPECTED_BOT_ID', '')
     if not expected or str(identity['id']) != expected:
         raise RuntimeError('GitHub BOT_TOKEN does not match the requested new bot; update the secret first')
+    api('setMyName', name='SceneLingo')
+    api('setMyDescription', description='Learn real expressions from movie scenes, at your pace. Choose your learning language, explanation language, level and message frequency. Save expressions and practise recall with /review.')
+    api('setMyShortDescription', short_description='SceneLingo · Learn languages, one scene at a time. 🎬')
+    commands = [
+        ('start','Set up subscription','إعداد الاشتراك'), ('language','Bot language','لغة البوت'),
+        ('learn','Learning language','لغة التعلّم'), ('level','Learning level','المستوى'),
+        ('explain','Explanation language','لغة الشرح'), ('interval','Message frequency','مواعيد الرسائل'),
+        ('saved','Saved expressions','التعبيرات المحفوظة'), ('review','Review an expression','مراجعة تعبير'),
+        ('today','Latest expression','آخر تعبير'), ('help','Help and commands','المساعدة'),
+        ('stop','Pause subscription','إيقاف الاشتراك'),
+    ]
+    api('setMyCommands', commands=[dict(command=cmd,description=en) for cmd,en,ar in commands])
+    api('setMyCommands', language_code='ar', commands=[dict(command=cmd,description=ar) for cmd,en,ar in commands])
     db.init_db()
     with db.connect() as conn, conn.cursor() as cur:
         cur.execute('SELECT count(*), count(*) FILTER (WHERE is_active) FROM subscribers')

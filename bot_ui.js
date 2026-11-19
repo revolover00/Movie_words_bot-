@@ -3,7 +3,7 @@ export const UI_LANGUAGES = new Set(['ar', 'en']);
 export const INTERVALS = [30, 60, 120, 180, 360, 720, 1440];
 const copy = {
   ar: {
-    welcome: '🎬 اتعلّم تعبيرات حقيقية من مشاهد الأفلام، بالوتيرة المناسبة ليك.\n\n/start — إعداد الاشتراك\n/language — لغة البوت\n/learn — لغة التعلّم\n/level — المستوى\n/explain — لغة الشرح\n/interval — مواعيد الرسائل\n/today — آخر تعبير\n/stop — إيقاف الاشتراك',
+    welcome: '🎬 SceneLingo\nاتعلّم تعبيرات حقيقية من مشاهد الأفلام، بالوتيرة المناسبة ليك.\n\n/start — إعداد الاشتراك\n/language — لغة البوت\n/learn — لغة التعلّم\n/level — المستوى\n/explain — لغة الشرح\n/interval — مواعيد الرسائل\n/today — آخر تعبير\n/saved — تعبيراتك المحفوظة\n/review — مراجعة تعبير\n/stop — إيقاف الاشتراك',
     setup_ui: 'أهلاً بيك 🎬\nاتعلّم لغة من مشهد، خطوة بخطوة.\n\nاختار لغة البوت أولاً — دي لغة القوائم، مش اللغة اللي هتتعلمها.\nChoose your bot language to get started.',
     setup_learn: '١ من ٤ · لغة التعلّم 🌍\nاختار اللغة اللي حابب تتعلم تعبيراتها من الأفلام:',
     setup_level: '٢ من ٤ · مستواك 📚\nاختار المستوى الأقرب ليك. تقدر تغيّره بعدين:',
@@ -32,7 +32,7 @@ const copy = {
     intervals: ['نص ساعة', 'ساعة', 'ساعتين', '٣ ساعات', '٦ ساعات', '١٢ ساعة', '٢٤ ساعة'],
   },
   en: {
-    welcome: '🎬 Learn real expressions from movie scenes, at your own pace.\n\n/start — Set up your subscription\n/language — Bot language\n/learn — Learning language\n/level — Level\n/explain — Explanation language\n/interval — Message frequency\n/today — Latest expression\n/stop — Pause subscription',
+    welcome: '🎬 SceneLingo\nLearn real expressions from movie scenes, at your own pace.\n\n/start — Set up your subscription\n/language — Bot language\n/learn — Learning language\n/level — Level\n/explain — Explanation language\n/interval — Message frequency\n/today — Latest expression\n/saved — Saved expressions\n/review — Review an expression\n/stop — Pause subscription',
     setup_ui: 'Welcome 🎬\nLearn a language, one scene at a time.\n\nChoose the bot language first. This controls menus, not the language you will learn.\nاختار لغة البوت للبدء.',
     setup_learn: '1 of 4 · Learning language 🌍\nWhich language would you like to learn through movie expressions?',
     setup_level: '2 of 4 · Your level 📚\nChoose the closest match. You can change it later:',
