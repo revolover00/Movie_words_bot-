@@ -173,3 +173,16 @@ node --test tests/telegram.test.js
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+### Starting with a different Telegram bot
+
+Each bot now stores subscriptions and expression history in its own Postgres schema,
+`bot_<numeric Telegram bot ID>`. Token rotation for the same bot retains its data;
+a different bot starts with an empty subscription list. Public/legacy tables are
+not deleted or imported. Both the webhook and scheduled sender use this isolation.
+
+Update `BOT_TOKEN` in Vercel and GitHub Actions, deploy, then run **Configure Telegram
+bot** with the new bot's numeric ID. The setup verifies the GitHub token belongs to
+that bot before initializing its schema or registering the production webhook.
+Users must open the new bot, press `/start`, and confirm setup before delivery.
+Never put tokens in source files or workflow inputs.
