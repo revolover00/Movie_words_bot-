@@ -39,21 +39,21 @@ test('start shows first guided language step and keeps existing level on conflic
 
 test('user can change level from a private callback', async () => {
   queries.length = 0; calls.length = 0;
-  await handler({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { chat: { id: 1, type: 'private' } }, data: 'level:C1' } } }, res());
+  await handler({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { message_id: 42, chat: { id: 1, type: 'private' } }, data: 'level:C1' } } }, res());
   assert.deepEqual(queries.find(q => q.sql.startsWith('UPDATE subscribers SET level')).values, ['C1', 1]);
   assert.match(calls.at(-1).body.text, /C1/);
 });
 
 test('invalid callback is rejected without database update', async () => {
   queries.length = 0; calls.length = 0;
-  await handler({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { chat: { id: 1, type: 'private' } }, data: 'level:ZZ' } } }, res());
+  await handler({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { message_id: 42, chat: { id: 1, type: 'private' } }, data: 'level:ZZ' } } }, res());
   assert.equal(queries.length, 0);
   assert.ok(calls.at(-1).url.endsWith('/answerCallbackQuery'));
 });
 
 test('language selection records the requested language', async () => {
   queries.length = 0; calls.length = 0;
-  await handler({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { chat: { id: 1, type: 'private' } }, data: 'learn:es' } } }, res());
+  await handler({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { message_id: 42, chat: { id: 1, type: 'private' } }, data: 'learn:es' } } }, res());
   const query = queries.find(q => q.sql.includes('INSERT INTO subscriber_preferences') && q.sql.includes('learning_language'));
   assert.deepEqual(query.values, ['es', 1]);
   assert.match(query.sql, /subscribed_at \+ interval '3 hours'/);
@@ -103,7 +103,7 @@ test('webhook returns failure for Telegram errors so updates can retry', async (
   }
 });
 
-const callbackUpdate = data => ({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { chat: { id: 1, type: 'private' } }, data } } });
+const callbackUpdate = data => ({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { message_id: 42, chat: { id: 1, type: 'private' } }, data } } });
 
 test('guided choices advance through all steps and schedule only on confirmation', async () => {
   setupSettings = { input_state: 'setup_ui', learning_language: 'en', explanation_language: 'ar', level: 'A2', interval_minutes: 180 };
@@ -118,6 +118,10 @@ test('guided choices advance through all steps and schedule only on confirmation
     queries.length = 0; calls.length = 0;
     await handler(callbackUpdate(`setup_${kind}:${value}`), res());
     assert.match(calls.at(-1).body.text, pattern);
+    assert.ok(calls.at(-1).url.endsWith('/editMessageText'));
+    assert.equal(calls.at(-1).body.message_id, 42);
+    assert.ok(!calls.some(call => call.url.endsWith('/sendMessage')));
+    if (!next) assert.deepEqual(calls.at(-1).body.reply_markup.inline_keyboard, []);
     const saved = queries.find(q => q.sql.includes('SET input_state = $1'));
     assert.equal(saved.values[0], next ? `setup_${next}` : null);
     setupSettings.input_state = next ? `setup_${next}` : null;
@@ -200,4 +204,53 @@ test('webhook isolates tables by the current bot identity', async () => {
   await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, text: '/help' } } }, res());
   assert.ok(queries.some(q => q.sql === 'CREATE SCHEMA IF NOT EXISTS "bot_123456"'));
   assert.ok(queries.some(q => q.sql === 'SET search_path TO "bot_123456"'));
+});
+
+
+test('restart and back edit the original setup message', async () => {
+  for (const action of ['setup_back:yes', 'setup_restart:yes']) {
+    setupSettings = { input_state: 'setup_interval', ui_language: 'en' };
+    calls.length = 0;
+    await handler(callbackUpdate(action), res());
+    assert.ok(calls.at(-1).url.endsWith('/editMessageText'));
+    assert.equal(calls.at(-1).body.message_id, 42);
+    assert.ok(!calls.some(call => call.url.endsWith('/sendMessage')));
+  }
+  setupSettings = null;
+});
+
+test('an unchanged screen is a successful no-op, not a retry or new message', async () => {
+  const previous = globalThis.fetch;
+  setupSettings = { input_state: 'setup_level' };
+  const methods = [];
+  globalThis.fetch = async (url) => {
+    methods.push(url.split('/').at(-1));
+    return url.endsWith('/editMessageText')
+      ? { ok: false, json: async () => ({ ok: false, error_code: 400, description: 'Bad Request: message is not modified' }) }
+      : { ok: true, json: async () => ({ ok: true }) };
+  };
+  try {
+    await handler(callbackUpdate('setup_confirm:yes'), res());
+    assert.deepEqual(methods, ['answerCallbackQuery', 'editMessageText']);
+  } finally { globalThis.fetch = previous; setupSettings = null; }
+});
+
+test('other edit errors remain failures without sending duplicate messages', async () => {
+  const previous = globalThis.fetch;
+  const previousError = console.error;
+  setupSettings = { input_state: 'setup_level' };
+  const methods = [];
+  let status;
+  globalThis.fetch = async (url) => {
+    methods.push(url.split('/').at(-1));
+    return url.endsWith('/editMessageText')
+      ? { ok: false, json: async () => ({ ok: false, error_code: 400, description: 'Bad Request: message to edit not found' }) }
+      : { ok: true, json: async () => ({ ok: true }) };
+  };
+  console.error = () => {};
+  try {
+    await handler(callbackUpdate('setup_confirm:yes'), { status(code) { status = code; return this; }, send() {} });
+    assert.equal(status, 500);
+    assert.ok(!methods.includes('sendMessage'));
+  } finally { globalThis.fetch = previous; console.error = previousError; setupSettings = null; }
 });
