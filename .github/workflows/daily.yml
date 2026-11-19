@@ -5,6 +5,10 @@ on:
     types: [daily-word]
   workflow_dispatch:
     inputs:
+      send_now:
+        description: Make all active subscribers with completed setup due now
+        type: boolean
+        default: false
       probe_yarn:
         description: Test Yarn without sending messages
         type: boolean
@@ -36,6 +40,12 @@ jobs:
 
       - name: Install Python dependencies and bundled FFmpeg
         run: pip install -r requirements.txt
+
+      - name: Count subscribers and prepare delivery
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SEND_NOW: ${{ github.event_name == 'workflow_dispatch' && inputs.send_now }}
+        run: python scripts/prepare_delivery.py
 
       - name: Run daily job
         env:
