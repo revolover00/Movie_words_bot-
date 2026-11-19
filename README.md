@@ -186,3 +186,25 @@ bot** with the new bot's numeric ID. The setup verifies the GitHub token belongs
 that bot before initializing its schema or registering the production webhook.
 Users must open the new bot, press `/start`, and confirm setup before delivery.
 Never put tokens in source files or workflow inputs.
+
+### Private administration dashboard
+
+Production URL: `https://scenelingoo.vercel.app/`. The root and `/dashboard` require
+HTTP Basic authentication over HTTPS (username `admin`). Store only a SHA-256 hash
+of a strong random password in the sensitive production variable
+`DASHBOARD_PASSWORD_HASH`; never use the bot token as a dashboard password. Missing
+configuration fails closed. All data responses use `private, no-store`. The dashboard
+is read-only: opening it cannot trigger content generation or broadcasts. It shows
+aggregate counts, active language/level/interval cohorts, due counts, recent expressions,
+and the last 30 coarse scheduler outcomes. No subscriber IDs or names are returned.
+
+Run history starts with this release. `completed` is a run outcome, not a delivery
+count, token usage figure, or guarantee of delivery. Details of errors remain in
+GitHub Actions; secrets and raw exception messages are not copied to the dashboard.
+The scheduler rechecks demand before clip search, explanation generation, and sending.
+No content generation occurs for empty or no-longer-due groups. One verified clip
+is shared per learning-language/level group and one explanation per requested
+explanation language, irrespective of delivery interval.
+
+The old Vercel domain is retained for compatibility. New webhook setup uses
+`https://scenelingoo.vercel.app/api/telegram`.
