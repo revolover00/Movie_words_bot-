@@ -3,6 +3,10 @@ name: Configure Telegram bot
 on:
   workflow_dispatch:
     inputs:
+      repair_webhook:
+        description: Only inspect and restore the existing Vercel webhook
+        type: boolean
+        default: false
       profile_only:
         description: Update and verify profile and commands without touching webhook or database
         type: boolean
@@ -26,7 +30,14 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
+      - name: Inspect and restore webhook
+        if: ${{ inputs.repair_webhook }}
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          REPAIR_WEBHOOK: 'true'
+        run: python scripts/check_webhook.py
       - name: Initialize bot database and register webhook
+        if: ${{ !inputs.repair_webhook }}
         env:
           WEBHOOK_URL: https://scenelingoo.vercel.app/api/telegram
           PROFILE_ONLY: ${{ inputs.profile_only }}
