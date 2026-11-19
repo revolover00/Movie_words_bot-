@@ -336,3 +336,12 @@ prepared slots. No early upload to an admin/staging Telegram chat is performed.
 GitHub runner startup/queues can delay both phases; a due time between cron ticks
 can wait until the next tick. Overlapping invocations share the existing workflow
 concurrency group and database lock. Do not promise second-accurate delivery.
+
+
+### Scheduler fallback
+
+The delivery workflow also has a native GitHub Actions schedule every ten minutes.
+The external `daily-word` dispatch remains supported. Both paths share workflow
+concurrency and the database worker lock; native schedules can be delayed and do
+not guarantee exact delivery times. The native schedule runs from the default
+branch and depends on GitHub Actions being enabled.
