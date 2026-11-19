@@ -373,3 +373,33 @@ check: prepare synthetic fixture content, delete its local file, reject early
 sending, shift only the fixture's clock to due, restore persisted media and simulate
 one send. No subscriber data is changed and no Telegram call is made. This tests
 storage and routing, not audio quality or actual Telegram transport.
+
+
+### Private subscriber administration
+
+The authenticated dashboard now includes a read-only subscriber directory, with
+50-row pages and parameterized search by stored name, username or Telegram ID.
+It shows stored first name/username, subscription status, language/level/interval
+preferences, setup state via status, subscription/settings timestamps, next due
+time and last recorded delivery outcome/error/expression. Telegram IDs are strings
+to preserve precision. There is no phone number, email, read receipt or other
+uncollected profile information. Names are currently refreshed by `/start` and may
+be stale or absent. Access requires the same private admin authentication; never
+share credentials or screenshots containing user data publicly.
+
+### Shared lesson library across delivery intervals
+
+Production chooses the **oldest unseen reusable lesson for each recipient** within
+their learning language and level. A 30-minute subscriber can advance through the
+library while hourly/daily subscribers consume those same lessons at their own due
+times. This is a per-person backlog, not a group-wide exclusion: a fast subscriber
+having seen lesson A no longer forces everyone else to skip A and generate more.
+
+The library uses existing Telegram file IDs or unexpired prepared media. Captions
+are reused separately by explanation language. Recorded sent/uncertain/sending
+lessons are excluded per recipient; pinned retries and prepared-slot assignments
+take priority. Normal subscription/settings/due-time checks and delivery claims
+still apply. If no matching reusable lesson exists, verified on-demand generation
+remains the fallback. This reduces redundant media/AI work, not the number of cron
+checks or Telegram sends. It does not create missing verified content or reduce
+quality/level to fill a gap.

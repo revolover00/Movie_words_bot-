@@ -20,6 +20,7 @@ def content():
 
 
 def fixture(monkeypatch):
+    monkeypatch.setattr(worker.store,'assign_cached',lambda subs:subs)
     monkeypatch.setattr(worker.db,'still_due_with_settings',lambda _:True)
     monkeypatch.setattr(worker.db,'advance_due_after_delivery',Mock(return_value=True))
     monkeypatch.setattr(worker.db,'remove_subscriber',Mock())
@@ -180,3 +181,15 @@ def test_retry_exhaustion_skips_slot_without_generation(monkeypatch):
     assert run(bot).skipped==1
     worker.db.advance_due_after_delivery.assert_called_once()
     worker.store.cached.assert_not_called()
+
+
+def test_shared_queue_splits_mixed_audience_without_new_generation(monkeypatch):
+    bot = fixture(monkeypatch)
+    monkeypatch.setattr(worker.store, 'assign_cached', lambda subs: [dict(s, queue_content_id=s['chat_id']) for s in subs])
+    monkeypatch.setattr(worker.store, 'get_content', lambda lesson: dict(content(), id=lesson))
+    select, explain = Mock(), Mock()
+    stats = asyncio.run(worker.run([subscriber(1),subscriber(2)], bot, select, explain, Mock(), shared_queue=True))
+    assert stats.sent == 2
+    select.assert_not_called()
+    explain.assert_not_called()
+    assert [c.args[1] for c in worker.store.claim.call_args_list] == [1,2]
