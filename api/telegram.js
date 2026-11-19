@@ -21,7 +21,7 @@ async function interfaceLanguage(chatId, fallback) {
   });
 }
 
-async function setupPrompt(chatId, state, settings = {}, fallback = 'ar') {
+async function setupPrompt(chatId, state, settings = {}, fallback = 'ar', messageId) {
   const lang = settings.ui_language || fallback;
   const keyboards = {
     setup_ui: () => uiKeyboard('setup_ui'),
@@ -33,13 +33,13 @@ async function setupPrompt(chatId, state, settings = {}, fallback = 'ar') {
   if (keyboards[state]) {
     const keyboard = keyboards[state]();
     if (state !== 'setup_ui') keyboard.inline_keyboard.push([{ text: text(lang, 'back'), callback_data: 'setup_back:yes' }]);
-    return sendMessage(chatId, text(lang, state), keyboard);
+    return renderMessage(chatId, text(lang, state), keyboard, messageId);
   }
-  return sendMessage(chatId, text(lang, 'review', {
+  return renderMessage(chatId, text(lang, 'review', {
     learn: label(settings.learning_language), level: settings.level,
     explain: label(settings.explanation_language), interval: intervalLabel(settings.interval_minutes, lang),
   }), { inline_keyboard: [[{ text: text(lang, 'confirm'), callback_data: 'setup_confirm:yes' }],
-    [{ text: text(lang, 'restart'), callback_data: 'setup_restart:yes' }]] });
+    [{ text: text(lang, 'restart'), callback_data: 'setup_restart:yes' }]] }, messageId);
 }
 
 // Persist and lock each step so stale buttons cannot skip or overwrite steps.
@@ -134,11 +134,23 @@ async function telegram(method, payload) {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
   });
   const body = await response.json();
+  // Repeated taps and retried callbacks may render exactly the same screen.
+  if (method === 'editMessageText' && body.error_code === 400 &&
+      body.description?.includes('message is not modified')) return;
   if (!response.ok || !body.ok) throw new Error(`Telegram ${method} failed: ${body.description || response.status}`);
 }
 
 async function sendMessage(chatId, text, keyboard) {
   await telegram('sendMessage', { chat_id: chatId, text, ...(keyboard ? { reply_markup: keyboard } : {}) });
+}
+
+// Only the initial command sends a message. Button navigation edits that message.
+async function renderMessage(chatId, text, keyboard, messageId) {
+  if (messageId == null) return sendMessage(chatId, text, keyboard);
+  await telegram('editMessageText', {
+    chat_id: chatId, message_id: messageId, text,
+    reply_markup: keyboard || { inline_keyboard: [] },
+  });
 }
 
 export default async function handler(req, res) {
@@ -148,6 +160,7 @@ export default async function handler(req, res) {
     const callback = update.callback_query;
     if (callback) {
       const chat = callback.message?.chat;
+      const messageId = callback.message?.message_id;
       const [kind, value] = (callback.data || '').split(':');
       const valid = (['level', 'setup_level'].includes(kind) && LEVELS.includes(value)) ||
         (['ui', 'setup_ui'].includes(kind) && UI_LANGUAGES.has(value)) ||
@@ -163,9 +176,9 @@ export default async function handler(req, res) {
       if (kind.startsWith('setup_')) {
         const result = await withDb(client => setupChoice(client, chat.id, kind, value));
         await telegram('answerCallbackQuery', { callback_query_id: callback.id });
-        if (result.missing) await sendMessage(chat.id, text(lang, 'missing'));
-        else if (result.state) await setupPrompt(chat.id, result.state, result.settings, lang);
-        else await sendMessage(chat.id, text(lang, 'done', { interval: intervalLabel(result.settings.interval_minutes, lang) }));
+        if (result.missing) await renderMessage(chat.id, text(lang, 'missing'), undefined, messageId);
+        else if (result.state) await setupPrompt(chat.id, result.state, result.settings, lang, messageId);
+        else await renderMessage(chat.id, text(lang, 'done', { interval: intervalLabel(result.settings.interval_minutes, lang) }), undefined, messageId);
         return res.status(200).send('ok');
       }
       const result = await withDb(async client => {
@@ -191,13 +204,13 @@ export default async function handler(req, res) {
       });
       await telegram('answerCallbackQuery', { callback_query_id: callback.id });
       if (result.setup) {
-        await setupPrompt(chat.id, result.setup, result.settings, lang);
+        await setupPrompt(chat.id, result.setup, result.settings, lang, messageId);
         return res.status(200).send('ok');
       }
       const displayValue = kind === 'interval' ? intervalLabel(value, lang) : label(value);
-      await sendMessage(chat.id, result.rowCount
+      await renderMessage(chat.id, result.rowCount
         ? text(kind === 'ui' ? value : lang, `saved_${kind}`, { value: displayValue })
-        : text(lang, 'subscribe'));
+        : text(lang, 'subscribe'), undefined, messageId);
       return res.status(200).send('ok');
     }
     const message = update.message || {};
