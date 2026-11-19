@@ -6,10 +6,14 @@ import handler from '../api/telegram.js';
 const queries = [];
 const calls = [];
 let inputState = null;
+let setupSettings = null;
+let uiLanguage = null;
 pg.Client.prototype.connect = async () => {};
 pg.Client.prototype.end = async () => {};
 pg.Client.prototype.query = async (sql, values) => {
   queries.push({ sql, values });
+  if (sql.startsWith('SELECT ui_language')) return { rows: uiLanguage ? [{ ui_language: uiLanguage }] : [] };
+  if (sql.startsWith('SELECT p.*, s.level')) return { rowCount: setupSettings ? 1 : 0, rows: setupSettings ? [{ ...setupSettings }] : [] };
   if (sql.startsWith('SELECT input_state')) return { rowCount: 1, rows: [{ input_state: inputState }] };
   if (sql.startsWith('UPDATE subscribers SET level')) return { rowCount: 1, rows: [{ level: values[0] }] };
   if (sql.startsWith('SELECT level FROM')) return { rowCount: 1, rows: [{ level: 'A2' }] };
@@ -23,13 +27,13 @@ globalThis.fetch = async (url, options) => {
 after(() => { globalThis.fetch = oldFetch; });
 function res() { return { status(code) { assert.equal(code, 200); return this; }, send() {} }; }
 
-test('start shows level buttons and keeps existing level on conflict', async () => {
+test('start shows first guided language step and keeps existing level on conflict', async () => {
   queries.length = 0; calls.length = 0;
   await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, from: { id: 1 }, text: '/start' } } }, res());
   const insert = queries.find(q => q.sql.includes('INSERT INTO subscribers'));
   assert.ok(insert);
   assert.ok(!insert.sql.includes('level = EXCLUDED'));
-  assert.equal(calls.at(-1).body.reply_markup.inline_keyboard[0].length, 5);
+  assert.equal(calls.at(-1).body.reply_markup.inline_keyboard[0].length, 2);
 });
 
 test('user can change level from a private callback', async () => {
@@ -52,27 +56,26 @@ test('language selection records the requested language', async () => {
   const query = queries.find(q => q.sql.includes('INSERT INTO subscriber_preferences') && q.sql.includes('learning_language'));
   assert.deepEqual(query.values, ['es', 1]);
   assert.match(query.sql, /subscribed_at \+ interval '3 hours'/);
-  assert.match(calls.at(-1).body.text, /es/);
+  assert.match(calls.at(-1).body.text, /Español/);
 });
 
-test('interval accepts Arabic numerals and rejects values outside bounds', async () => {
-  inputState = 'interval'; queries.length = 0; calls.length = 0;
-  const update = text => ({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, from: { id: 1 }, text } } });
-  await handler(update('٤'), res());
-  assert.match(calls.at(-1).body.text, /٥/);
-  assert.ok(!queries.some(q => q.sql.startsWith('UPDATE subscriber_preferences SET interval_minutes')));
-  await handler(update('٦'), res());
-  const saved = queries.find(q => q.sql.startsWith('UPDATE subscriber_preferences SET interval_minutes'));
-  assert.deepEqual(saved.values, [6, 1]);
-  inputState = null;
+test('typed intervals never save settings and show preset buttons', async () => {
+  setupSettings = { input_state: 'interval' };
+  for (const typed of ['٣٠', '1440', '45', 'نص ساعة']) {
+    queries.length = 0; calls.length = 0;
+    await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, text: typed } } }, res());
+    assert.match(calls.at(-1).body.text, /الأزرار/);
+    assert.equal(calls.at(-1).body.reply_markup.inline_keyboard.length, 7);
+    assert.ok(!queries.some(q => q.sql.includes('SET interval_minutes = $1')));
+  }
+  setupSettings = null;
 });
 
-test('welcome explains language and interval controls', async () => {
+test('start explains ordered setup instead of a command dump', async () => {
   calls.length = 0;
   await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, from: { id: 1 }, text: '/start' } } }, res());
-  assert.match(calls.at(-1).body.text, /\/learn/);
-  assert.match(calls.at(-1).body.text, /\/explain/);
-  assert.match(calls.at(-1).body.text, /\/interval/);
+  assert.match(calls.at(-1).body.text, /لغة البوت/);
+  assert.equal(calls.at(-1).body.reply_markup.inline_keyboard[0][0].callback_data, 'setup_ui:ar');
 });
 
 
@@ -97,4 +100,95 @@ test('webhook returns failure for Telegram errors so updates can retry', async (
     console.error = previousError;
     globalThis.fetch = previous;
   }
+});
+
+const callbackUpdate = data => ({ method: 'POST', body: { callback_query: { id: 'cb', from: { id: 1 }, message: { chat: { id: 1, type: 'private' } }, data } } });
+
+test('guided choices advance through all steps and schedule only on confirmation', async () => {
+  setupSettings = { input_state: 'setup_ui', learning_language: 'en', explanation_language: 'ar', level: 'A2', interval_minutes: 180 };
+  for (const [kind, value, next, pattern] of [
+    ['ui', 'ar', 'learn', /١ من ٤/],
+    ['learn', 'es', 'level', /٢ من ٤/],
+    ['level', 'B2', 'explain', /٣ من ٤/],
+    ['explain', 'ar', 'interval', /٤ من ٤/],
+    ['interval', '30', 'confirm', /كل حاجة جاهزة/],
+    ['confirm', 'yes', null, /اشتراكك جاهز/],
+  ]) {
+    queries.length = 0; calls.length = 0;
+    await handler(callbackUpdate(`setup_${kind}:${value}`), res());
+    assert.match(calls.at(-1).body.text, pattern);
+    const saved = queries.find(q => q.sql.includes('SET input_state = $1'));
+    assert.equal(saved.values[0], next ? `setup_${next}` : null);
+    setupSettings.input_state = next ? `setup_${next}` : null;
+  }
+  setupSettings = null;
+});
+
+test('stale setup buttons redisplay current step without saving', async () => {
+  setupSettings = { input_state: 'setup_level' };
+  queries.length = 0; calls.length = 0;
+  await handler(callbackUpdate('setup_confirm:yes'), res());
+  assert.match(calls.at(-1).body.text, /٢ من ٤/);
+  assert.ok(!queries.some(q => q.sql.includes('SET input_state = $1')));
+  setupSettings = null;
+});
+
+test('interval callback validates minimum and maximum', async () => {
+  for (const value of ['29', '1441', '-1', '30.5', '45', '90', '030']) {
+    queries.length = 0;
+    await handler(callbackUpdate(`interval:${value}`), res());
+    assert.equal(queries.length, 0);
+  }
+  for (const value of ['30', '1440']) {
+    queries.length = 0;
+    await handler(callbackUpdate(`interval:${value}`), res());
+    assert.ok(queries.some(q => q.sql.includes('SET interval_minutes = $1')));
+  }
+});
+
+test('typing minutes during setup does not advance to confirmation', async () => {
+  setupSettings = { input_state: 'setup_interval', level: 'B1', learning_language: 'en', explanation_language: 'ar' };
+  queries.length = 0; calls.length = 0;
+  await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, text: '١٤٤٠' } } }, res());
+  assert.match(calls.at(-1).body.text, /٤ من ٤/);
+  assert.equal(calls.at(-1).body.reply_markup.inline_keyboard[0][0].callback_data, 'setup_interval:30');
+  assert.ok(!queries.some(q => q.sql.includes('SET input_state = $1')));
+  setupSettings = null;
+});
+
+test('English interface choice localizes the very next step', async () => {
+  setupSettings = { input_state: 'setup_ui', ui_language: 'ar' };
+  calls.length = 0;
+  await handler(callbackUpdate('setup_ui:en'), res());
+  assert.match(calls.at(-1).body.text, /1 of 4/);
+  const saved = queries.findLast(q => q.sql.includes('SET ui_language = $1'));
+  assert.deepEqual(saved.values, ['en', 1]);
+  setupSettings = null;
+});
+
+test('saved interface language takes precedence over Telegram language', async () => {
+  uiLanguage = 'en'; calls.length = 0;
+  await handler({ method: 'POST', body: { message: { chat: { id: 1, type: 'private' }, from: { language_code: 'ar' }, text: '/help' } } }, res());
+  assert.match(calls.at(-1).body.text, /Message frequency/);
+  uiLanguage = null;
+});
+
+test('bot language changes do not overwrite learning or explanation preferences', async () => {
+  queries.length = 0; calls.length = 0;
+  await handler(callbackUpdate('ui:en'), res());
+  const query = queries.find(q => q.sql.includes('INSERT INTO subscriber_preferences'));
+  assert.deepEqual(query.values, ['en', 1]);
+  assert.ok(!query.sql.includes('learning_language'));
+  assert.ok(!query.sql.includes('explanation_language'));
+  assert.match(calls.at(-1).body.text, /Bot language changed to English/);
+});
+
+test('back button returns to previous step without overwriting choices', async () => {
+  setupSettings = { input_state: 'setup_interval', ui_language: 'en' };
+  queries.length = 0; calls.length = 0;
+  await handler(callbackUpdate('setup_back:yes'), res());
+  assert.match(calls.at(-1).body.text, /3 of 4/);
+  assert.equal(queries.find(q => q.sql.includes('SET input_state = $1')).values[0], 'setup_explain');
+  assert.ok(!queries.some(q => q.sql.includes('SET interval_minutes = $1')));
+  setupSettings = null;
 });

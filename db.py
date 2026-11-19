@@ -155,6 +155,7 @@ def due_subscribers() -> list[dict]:
                 FROM subscribers s
                 LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
                 WHERE s.is_active = TRUE
+                  AND COALESCE(p.input_state, '') NOT LIKE 'setup_%'
                   AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()
                 ORDER BY COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours'), s.chat_id
             """)
@@ -212,6 +213,7 @@ def still_due_with_settings(subscriber: dict) -> bool:
             WHERE s.chat_id = %s AND s.is_active = TRUE AND s.level = %s
               AND COALESCE(p.learning_language, 'en') = %s
               AND COALESCE(p.explanation_language, 'ar') = %s
+              AND LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'
               AND p.updated_at IS NOT DISTINCT FROM %s
               AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now()
         """, (subscriber['chat_id'], subscriber['level'], subscriber['learning_language'],
