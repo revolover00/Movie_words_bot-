@@ -1,6 +1,8 @@
 // Telegram webhook: subscribe, change CEFR level, and see the latest expression.
 import pg from 'pg';
+import { applyLessonAction, lessonAction } from '../lib/lesson-actions.js';
 import { readFileSync } from 'node:fs';
+const reliabilitySql = readFileSync(new URL('../reliability.sql', import.meta.url), 'utf8');
 const scheduleSql = readFileSync(new URL('../scheduling.sql', import.meta.url), 'utf8');
 import { text, intervalLabel, validInterval, intervalKeyboard, levelKeyboard, uiKeyboard, UI_LANGUAGES } from '../bot_ui.js';
 
@@ -126,6 +128,10 @@ ALTER TABLE subscriber_preferences ADD CONSTRAINT subscriber_preferences_interva
       END IF;
     END $$`);
     await client.query(scheduleSql);
+    await client.query(`CREATE TABLE IF NOT EXISTS delivery_runs (
+      id BIGSERIAL PRIMARY KEY,status TEXT NOT NULL CHECK(status IN ('idle','completed','failed')),
+      due_count INTEGER NOT NULL,finished_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+    await client.query(reliabilitySql);
     return await fn(client);
   } finally {
     await client.end();
@@ -157,7 +163,7 @@ async function renderMessage(chatId, text, keyboard, messageId) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(200).send('Movie Word Bot webhook');
+  if (req.method !== 'POST') return res.status(200).send('SceneLingo webhook');
   try {
     const update = req.body || {};
     const callback = update.callback_query;
@@ -165,7 +171,7 @@ export default async function handler(req, res) {
       const chat = callback.message?.chat;
       const messageId = callback.message?.message_id;
       const [kind, value] = (callback.data || '').split(':');
-      const valid = (['level', 'setup_level'].includes(kind) && LEVELS.includes(value)) ||
+      const valid = (lessonAction(kind) && /^[1-9][0-9]{0,15}$/.test(value)) || (['level', 'setup_level'].includes(kind) && LEVELS.includes(value)) ||
         (['ui', 'setup_ui'].includes(kind) && UI_LANGUAGES.has(value)) ||
         (['setup_learn', 'setup_explain'].includes(kind) && CODES.has(value)) ||
         (['interval', 'setup_interval'].includes(kind) && validInterval(value)) ||
@@ -176,6 +182,19 @@ export default async function handler(req, res) {
         return res.status(200).send('ok');
       }
       const lang = await interfaceLanguage(chat.id, fallbackLanguage(callback.from));
+      if (lessonAction(kind)) {
+        const action = await withDb(client => applyLessonAction(client, chat.id, kind, value));
+        const ar = lang === 'ar';
+        const notices = ar ? {saved:'اتحفظ ⭐ راجعه من /saved أو /review',reported:'وصلتنا الملاحظة، شكرًا ليك',reviewed:'اتحدد موعد المراجعة الجاية ✅',missing:'التعبير غير متاح أو الاختيار اتسجل قبل كده'}
+          : {saved:'Saved ⭐ Use /saved or /review',reported:'Thanks for your feedback',reviewed:'Next review scheduled ✅',missing:'Lesson unavailable or already reviewed'};
+        await telegram('answerCallbackQuery', {callback_query_id:callback.id,text:notices[action.kind] || ''});
+        if (action.kind === 'show') await renderMessage(chat.id, action.caption, {inline_keyboard:[[
+          {text:ar?'فاكره ✅':'Remembered ✅',callback_data:`lesson_known:${value}`},
+          {text:ar?'أراجعه بكرة ↻':'Review tomorrow ↻',callback_data:`lesson_repeat:${value}`}
+        ]]}, messageId);
+        else if (action.kind === 'reviewed') await renderMessage(chat.id, notices.reviewed, undefined, messageId);
+        return res.status(200).send('ok');
+      }
       if (kind.startsWith('setup_')) {
         const result = await withDb(client => setupChoice(client, chat.id, kind, value));
         await telegram('answerCallbackQuery', { callback_query_id: callback.id });
@@ -222,7 +241,17 @@ export default async function handler(req, res) {
     const command = (message.text || '').trim().split(/\s+/)[0].split('@')[0].toLowerCase();
     const chatId = chat.id;
     const lang = await interfaceLanguage(chatId, fallbackLanguage(message.from));
-    if (command === '/start') {
+    if (command === '/saved' || command === '/review') {
+      const rows = await withDb(async client => (await client.query(`SELECT s.content_id,c.phrase,c.learning_language
+        FROM saved_lessons s JOIN lesson_content c ON c.id=s.content_id
+        WHERE s.chat_id=$1 ${command === '/review' ? 'AND s.next_review_at<=now()' : ''}
+        ORDER BY s.next_review_at LIMIT 10`, [chatId])).rows);
+      const ar = lang === 'ar';
+      if (!rows.length) await sendMessage(chatId, ar?'مفيش تعبيرات مستحقة للمراجعة أو محفوظة لسه. احفظ تعبير من الزر تحت المقطع ⭐':'No saved lessons or reviews due yet. Save an expression below a clip ⭐');
+      else if (command === '/saved') await sendMessage(chatId, (ar?'⭐ تعبيراتك المحفوظة (أول ١٠)\n\n':'⭐ Your saved expressions (first 10)\n\n')+rows.map(row=>`${row.phrase} · ${row.learning_language.toUpperCase()}`).join('\n\n')+'\n\n/review');
+      else await sendMessage(chatId,(ar?'🧠 حاول تفتكر المعنى ومثال لاستخدام التعبير:\n\n':'🧠 Recall the meaning and think of an example:\n\n')+rows[0].phrase,
+        {inline_keyboard:[[{text:ar?'إظهار الشرح':'Show explanation',callback_data:`lesson_show:${rows[0].content_id}`}]]});
+    } else if (command === '/start') {
       await withDb(async client => {
         await client.query('BEGIN');
         try {

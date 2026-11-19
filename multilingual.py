@@ -15,6 +15,7 @@ from config import config
 from preferences import LANGUAGES, validate_language
 from media_tools import ffmpeg_executable
 from lessons import parse_lesson, render_lesson
+from ai_observability import tracked
 
 log = logging.getLogger(__name__)
 NAMES = {item['code']: item['name'] for item in LANGUAGES}
@@ -40,7 +41,7 @@ def expressions(language: str, level: str, seen: set[str], recent_topics: list[s
               f'Avoid these recent topics: {", ".join(recent_topics[:3])}. '
               f'Avoid these already-used phrases: {", ".join(list(seen)[-100:])}. '
               'Return only JSON: {"expressions": [{"text": "...", "topic": "..."}]}')
-    response = client().chat.completions.create(
+    response = tracked('expressions', client().chat.completions.create,
         model=config.groq_model, messages=[{'role': 'user', 'content': prompt}],
         temperature=0.6, max_tokens=1200, response_format={'type': 'json_object'},
     )
@@ -85,7 +86,7 @@ def meaning(phrase: str, learning: str, explanation: str, level: str) -> str:
         'If the expression is ambiguous without context, acknowledge that briefly '
         'and explain its common conversational meaning.'
     )
-    response = client().chat.completions.create(
+    response = tracked('explanation', client().chat.completions.create,
         model=config.groq_model,
         messages=[{'role': 'system', 'content': 'You are a precise language tutor. Return only the requested JSON lesson.'},
                   {'role': 'user', 'content': prompt}],
@@ -135,7 +136,7 @@ def transcript_for_language(path: Path, language: str) -> str | None:
     if not likely_audio_language(path, language):
         return None
     with path.open('rb') as video:
-        transcript = client().audio.transcriptions.create(
+        transcript = tracked('transcription', client().audio.transcriptions.create,
             model='whisper-large-v3-turbo', file=video,
             response_format='verbose_json', temperature=0,
         )

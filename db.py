@@ -45,6 +45,7 @@ def init_db() -> None:
         with conn.cursor() as cur:
             cur.execute(ddl)
             cur.execute(Path(__file__).with_name('scheduling.sql').read_text(encoding='utf-8'))
+            cur.execute(Path(__file__).with_name('reliability.sql').read_text(encoding='utf-8'))
         conn.commit()
     log.info("Database initialized")
 
@@ -139,7 +140,13 @@ def active_subscribers_by_level() -> dict[str, list[int]]:
 
 def phrase_history(level: str, language: str = 'en') -> tuple[set[str], list[str]]:
     with connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT phrase, topic FROM sent_phrases WHERE level = %s AND learning_language = %s ORDER BY sent_at DESC", (level, language))
+        cur.execute("""SELECT phrase,topic FROM (
+            SELECT phrase,topic,sent_at FROM sent_phrases WHERE level=%s AND learning_language=%s
+            UNION ALL
+            SELECT c.phrase,c.topic,a.updated_at AS sent_at FROM lesson_content c
+            JOIN delivery_attempts a ON a.content_id=c.id
+            WHERE c.level=%s AND c.learning_language=%s AND a.status IN ('sent','uncertain')
+        ) history ORDER BY sent_at DESC""", (level, language, level, language))
         rows = cur.fetchall()
         return {row[0].casefold() for row in rows}, [row[1] for row in rows[:3]]
 
@@ -165,7 +172,9 @@ def due_subscribers() -> list[dict]:
                        COALESCE(p.learning_language, 'en') AS learning_language,
                        COALESCE(p.explanation_language, 'ar') AS explanation_language,
                        COALESCE(p.interval_minutes, 180) AS interval_minutes,
-                       p.updated_at AS settings_updated_at
+                       p.updated_at AS settings_updated_at,
+                       COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') AS due_at,
+                       COALESCE(p.ui_language, 'ar') AS ui_language
                 FROM subscribers s
                 LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
                 WHERE s.is_active = TRUE
