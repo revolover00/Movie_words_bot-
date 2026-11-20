@@ -14,6 +14,7 @@ not a penetration test, compliance certification or guarantee of no remaining bu
 | Medium | A rejected Telegram file ID was reused for later recipients, and the first recipient's schedule was advanced despite definite rejection. | Invalidate the cache, preserve the refused slot for bounded retry, and skip remaining recipients of that cohort instead of sending the known-invalid reference. No replay of ambiguous sends was added. |
 | Medium | Eligibility compared settings and overdue status, but not the snapshot's exact slot. | Match the captured due timestamp when present, including the lookahead path. |
 | Medium | A growing file could be read unbounded before a post-read size check. | Read at most the configured media limit plus one byte, then reject oversize content. |
+| Medium | Reloading a saved lesson could select a different matching movie while retaining the original caption/source. | Refuse a reloaded clip whose identity differs from the saved lesson; no silent source substitution. |
 | Low | Local Serverless credentials and environment variants were not explicitly ignored. | Ignore `.tgcloud/` and `.env.*`, preserving `.env.example`. |
 
 ## Validation
