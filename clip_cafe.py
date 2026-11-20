@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 import logging
-import re
 import random
+import re
 import time
 import unicodedata
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlencode, urljoin, urlparse
-from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import URLError
+from urllib.parse import urlencode, urljoin, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 BASE = 'https://clip.cafe/'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'}

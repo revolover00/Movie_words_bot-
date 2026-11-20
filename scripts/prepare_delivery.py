@@ -6,8 +6,8 @@ Delivery still uses the normal verification, preflight and scheduling pipeline.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import db
@@ -35,7 +35,7 @@ def prepare(force: bool = False) -> dict:
                 RETURNING chat_id
             """)
             queued = cur.rowcount
-    return dict(total=total, active=active, eligible=eligible, stopped=stopped, queued=queued)
+    return {'total': total, 'active': active, 'eligible': eligible, 'stopped': stopped, 'queued': queued}
 
 
 def main() -> None:

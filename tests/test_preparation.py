@@ -1,8 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+from test_reliable_delivery import content, fixture, subscriber
+
 import preparation as prep
-from test_reliable_delivery import subscriber, content, fixture, run
 import reliable_delivery as worker
 
 
@@ -116,8 +117,8 @@ def test_future_recipient_is_not_sent_even_when_ready(monkeypatch):
 
 
 def test_restore_cleans_temporary_file_and_avoids_download(monkeypatch):
-    from unittest.mock import MagicMock
     from pathlib import Path
+    from unittest.mock import MagicMock
     conn, cur = MagicMock(), MagicMock()
     conn.__enter__.return_value = conn
     conn.cursor.return_value.__enter__.return_value = cur
@@ -146,6 +147,7 @@ def test_restore_missing_media_uses_verified_fallback(monkeypatch):
 
 def test_buffer_budget_blocks_write(monkeypatch, tmp_path):
     from unittest.mock import MagicMock
+
     import pytest
     path = tmp_path/'clip.mp4'; path.write_bytes(b'abc')
     conn, cur = MagicMock(), MagicMock()

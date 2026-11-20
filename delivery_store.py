@@ -1,8 +1,11 @@
 """Durable bot-local delivery ledger and reusable verified Telegram video cache."""
 from __future__ import annotations
+
 import hashlib
 from contextlib import contextmanager
+
 import psycopg2.extras
+
 import db
 
 
