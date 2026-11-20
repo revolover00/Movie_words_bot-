@@ -131,3 +131,13 @@ verification remain mandatory. Missing/changed original media still fails safely
 Content failures now log the safe processing-stage name (`lookup`,
 `restore_saved_media`, `select_new_clip`, `check_unseen`) rather than only an opaque
 exception class.
+
+The direct-connection rollout also exposed a refused worker lock in the real
+workflow. Legacy transaction-pooled session locks may remain on pooled backends,
+so direct-session workers use a fresh namespace, **7195**, instead of 7194. No
+pooled backend is terminated and no uncertain delivery is replayed. Failure to
+acquire the lock now fails visibly rather than returning a misleading idle success.
+The database migration workflow includes a two-connection, randomly namespaced
+check: session settings survive commits independently, a simultaneous lock is
+refused, and disconnecting its owner releases it. This does not touch subscriber
+tables or actual worker lock keys.
