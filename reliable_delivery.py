@@ -137,10 +137,14 @@ async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepar
             log.warning('Content unavailable for %s/%s (%s)', level, learning, type(error).__name__)
             stats.failed += len(audience)
             continue
+        invalid_cached = False
         explanations = defaultdict(list)
         for sub in audience:
             explanations[sub['explanation_language']].append(sub)
         for language, recipients in explanations.items():
+            if invalid_cached:
+                stats.skipped += len(recipients)
+                continue
             eligible = [s for s in recipients if db.still_due_with_settings(s)]
             stats.skipped += len(recipients) - len(eligible)
             recipients = eligible
@@ -158,7 +162,7 @@ async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepar
                 log.warning('Explanation unavailable (%s)', type(error).__name__)
                 stats.failed += len(recipients)
                 continue
-            for sub in recipients:
+            for recipient_index, sub in enumerate(recipients):
                 if not db.still_due_with_settings(sub):
                     stats.skipped += 1
                     continue
@@ -199,13 +203,20 @@ async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepar
                     stats.failed += 1
                     if code == 'cached_media_invalid':
                         store.file_id(content['id'], None)
-                        # Keep the rejected reference in this cohort: subsequent
-                        # recipients get an explicit refusal, never an ambiguous
-                        # attempt to open a missing local clip. Next run reloads it.
-                    if code != 'rate_limited':
+                        invalid_cached = True
+                        # Explicit rejection is safe to retry after reloading the
+                        # original verified lesson. Never send a known-invalid ID
+                        # to the remaining recipients in this cohort.
+                        stats.skipped += len(recipients) - recipient_index - 1
+                        break
+                    if code not in ('rate_limited', 'cached_media_invalid'):
                         db.advance_due_after_delivery(sub['chat_id'], sub['settings_updated_at'])
                 await asyncio.sleep(config.send_delay)
         # History is best effort, and never controls slot deduplication.
         if stats.sent > sent_before:
-            db.mark_phrase_sent(level, content['phrase'], content['topic'], content['clip_id'], content['video_title'], learning)
+            try:
+                db.mark_phrase_sent(level, content['phrase'], content['topic'], content['clip_id'], content['video_title'], learning)
+            except Exception:
+                # The durable receipt already controls replay prevention/history.
+                log.warning('Legacy phrase summary unavailable; delivery receipt retained')
     return stats

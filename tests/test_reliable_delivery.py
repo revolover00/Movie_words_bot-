@@ -194,3 +194,20 @@ def test_shared_queue_splits_mixed_audience_without_new_generation(monkeypatch):
     select.assert_not_called()
     explain.assert_not_called()
     assert [c.args[1] for c in worker.store.claim.call_args_list] == [1,2]
+
+
+def test_invalid_file_stops_cohort_and_preserves_schedule_for_safe_retry(monkeypatch):
+    bot=fixture(monkeypatch)
+    bot.send_video.side_effect=BadRequest('Wrong file identifier')
+    stats=run(bot,[subscriber(1),subscriber(2)])
+    assert stats.failed==1 and stats.skipped==1
+    assert bot.send_video.call_count==1
+    worker.db.advance_due_after_delivery.assert_not_called()
+
+
+def test_legacy_summary_failure_does_not_abort_next_group(monkeypatch):
+    bot=fixture(monkeypatch)
+    worker.db.mark_phrase_sent.side_effect=RuntimeError('summary unavailable')
+    users=[subscriber(1),dict(subscriber(2),level='B2')]
+    assert run(bot,users).sent==2
+    assert bot.send_video.call_count==2

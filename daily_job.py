@@ -80,6 +80,15 @@ def select_localized_clip(level: str, learning: str):
     raise RuntimeError(f'No verified clip for {level}/{learning}')
 
 
+def reload_verified_clip(content):
+    """Never attach a saved lesson's caption/source to a different movie clip."""
+    clip = clip_cafe.find_clip(content['phrase'], audio_language=content['learning_language'],
+        verify=lambda path, phrase: multilingual.verify_audio(path, phrase, content['learning_language']))
+    if clip.clip_id != content['clip_id']:
+        raise RuntimeError('Original lesson clip is unavailable; refusing source substitution')
+    return clip
+
+
 def build_localized_message(level: str, learning: str, explanation: str):
     expression, clip = select_localized_clip(level, learning)
     return expression, clip, localized_caption(expression.text, clip, level, learning, explanation)
@@ -212,15 +221,12 @@ def main() -> None:
         started = time.monotonic()
         status = 'failed'
 
-        def reload_clip(content):
-            return clip_cafe.find_clip(content['phrase'], audio_language=content['learning_language'],
-                verify=lambda path, phrase: multilingual.verify_audio(path, phrase, content['learning_language']))
 
         try:
             # Send due lessons first, so future preparation cannot delay them.
             with ExitStack() as media:
                 def restore_clip(content):
-                    return media.enter_context(preparation.restore(content, reload_clip))
+                    return media.enter_context(preparation.restore(content, reload_verified_clip))
                 asyncio.run(run(subscribers, Bot(token=config.bot_token), select_localized_clip,
                                 localized_caption, restore_clip, stats, prepared_lookup=preparation.ready, shared_queue=True))
             prepared, failed = preparation.prepare([sub for sub in db.due_subscribers(10) if sub['due_at'] > datetime.now(timezone.utc)], select_localized_clip, localized_caption)
