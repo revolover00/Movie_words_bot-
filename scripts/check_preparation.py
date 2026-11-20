@@ -42,7 +42,7 @@ def main():
             cur.execute(sql.SQL('CREATE SCHEMA {}').format(sql.Identifier(schema)))
         db.connect = connect
         db.init_db()
-        with connect() as conn, conn.cursor() as cur:
+        with db.session() as conn, conn.cursor() as cur:
             cur.execute("INSERT INTO subscribers(chat_id,level) VALUES(1,'B1')")
             cur.execute("INSERT INTO subscriber_preferences(chat_id,next_due_at,interval_minutes) VALUES(1,now()+interval '5 minutes',30)")
         with tempfile.TemporaryDirectory() as directory:
@@ -67,7 +67,7 @@ def main():
             assert stats.sent == 0
             bot.send_video.assert_not_called()
             # Advance only the fixture clock by shifting both sides of its slot key.
-            with connect() as conn, conn.cursor() as cur:
+            with db.session() as conn, conn.cursor() as cur:
                 cur.execute("UPDATE subscriber_preferences SET next_due_at=now()-interval '1 minute' RETURNING next_due_at")
                 due = cur.fetchone()[0]
                 cur.execute('UPDATE prepared_slots SET due_at=%s', (due,))
@@ -80,12 +80,12 @@ def main():
             select.assert_called_once()
             explain.assert_called_once()
             fallback.assert_not_called()
-            with connect() as conn, conn.cursor() as cur:
+            with db.session() as conn, conn.cursor() as cur:
                 cur.execute("SELECT count(*) FROM delivery_attempts WHERE status='sent'")
                 assert cur.fetchone()[0] == 1
             assert db.due_subscribers() == []
             # A daily subscriber later consumes the same persisted lesson.
-            with connect() as conn, conn.cursor() as cur:
+            with db.session() as conn, conn.cursor() as cur:
                 cur.execute("INSERT INTO subscribers(chat_id,level) VALUES(2,'B1')")
                 cur.execute("INSERT INTO subscriber_preferences(chat_id,next_due_at,interval_minutes) VALUES(2,now()-interval '1 minute',1440)")
             with ExitStack() as media:

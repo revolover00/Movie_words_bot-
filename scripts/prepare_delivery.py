@@ -15,7 +15,7 @@ import db
 
 def prepare(force: bool = False) -> dict:
     db.init_db()
-    with db.connect() as conn, conn.cursor() as cur:
+    with db.session() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT count(*), count(*) FILTER (WHERE s.is_active),
                 count(*) FILTER (WHERE s.is_active AND LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'),

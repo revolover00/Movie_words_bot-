@@ -19,14 +19,14 @@ MAX_TOTAL = 80 * 1024 * 1024
 
 
 def cleanup():
-    with db.connect() as conn, conn.cursor() as cur:
+    with db.session() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM prepared_slots WHERE due_at < now()-interval '24 hours'")
         cur.execute('''DELETE FROM prepared_media m WHERE expires_at <= now()
             OR EXISTS (SELECT 1 FROM lesson_content c WHERE c.id=m.content_id AND c.telegram_file_id IS NOT NULL)''')
 
 
 def ready(sub, require_caption=True):
-    with db.connect() as conn, conn.cursor() as cur:
+    with db.session() as conn, conn.cursor() as cur:
         cur.execute('''SELECT p.content_id FROM prepared_slots p
             JOIN lesson_content c ON c.id=p.content_id
             WHERE p.chat_id=%s AND p.due_at=%s
@@ -44,10 +44,11 @@ def save_media(content_id, path):
     path = Path(path)
     if path.stat().st_size > MAX_ITEM:
         raise ValueError('Prepared clip exceeds 20 MiB buffer limit')
-    payload = path.read_bytes()
+    with path.open('rb') as media:
+        payload = media.read(MAX_ITEM + 1)
     if len(payload) > MAX_ITEM:
         raise ValueError('Prepared clip grew beyond buffer limit')
-    with db.connect() as conn, conn.cursor() as cur:
+    with db.session() as conn, conn.cursor() as cur:
         # Same worker lock as delivery serializes budget accounting.
         cur.execute('SELECT COALESCE(sum(octet_length(payload)),0) FROM prepared_media WHERE content_id<>%s', (content_id,))
         if cur.fetchone()[0] + len(payload) > MAX_TOTAL:
@@ -58,7 +59,7 @@ def save_media(content_id, path):
 
 
 def reserve(sub, content_id):
-    with db.connect() as conn, conn.cursor() as cur:
+    with db.session() as conn, conn.cursor() as cur:
         cur.execute('''INSERT INTO prepared_slots(chat_id,due_at,settings_updated_at,content_id)
             VALUES(%s,%s,%s,%s) ON CONFLICT(chat_id,due_at) DO UPDATE SET
             settings_updated_at=EXCLUDED.settings_updated_at,content_id=EXCLUDED.content_id,created_at=now()''',
@@ -118,7 +119,7 @@ def restore(content, fallback):
 
     @contextmanager
     def materialize():
-        with db.connect() as conn, conn.cursor() as cur:
+        with db.session() as conn, conn.cursor() as cur:
             cur.execute('SELECT payload FROM prepared_media WHERE content_id=%s AND expires_at>now()', (content['id'],))
             row = cur.fetchone()
         if row:
@@ -143,7 +144,7 @@ def prepare(subscribers, select, explain):
         raise
     finally:
         try:
-            with db.connect() as conn, conn.cursor() as cur:
+            with db.session() as conn, conn.cursor() as cur:
                 cur.execute("""INSERT INTO preparation_runs(prepared_count,failed_count,duration_seconds)
                     VALUES(%s,%s,%s)""", (prepared, failed, time.monotonic()-started))
                 cur.execute("DELETE FROM preparation_runs WHERE finished_at<now()-interval '30 days'")

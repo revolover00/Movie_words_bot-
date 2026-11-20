@@ -1,5 +1,6 @@
 // Telegram webhook: subscribe, change CEFR level, and see the latest expression.
 import pg from 'pg';
+import { postgresOptions } from '../lib/postgres-config.js';
 import { authorizedWebhook } from '../lib/webhook-auth.js';
 import { applyLessonAction, lessonAction } from '../lib/lesson-actions.js';
 import { readFileSync } from 'node:fs';
@@ -85,7 +86,7 @@ async function setupChoice(client, chatId, kind, value) {
 }
 
 async function withDb(fn) {
-  const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  const client = new Client(postgresOptions(process.env.DATABASE_URL));
   await client.connect();
   try {
     const botId = (process.env.BOT_TOKEN || '').split(':')[0];
