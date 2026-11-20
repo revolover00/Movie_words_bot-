@@ -15,7 +15,7 @@ def reconcile(failed, run_url):
     issues = json.loads(gh('issue', 'list', '--state', 'open', '--search', f'{TITLE} in:title',
                            '--limit', '100', '--json', 'number,title,body,author'))
     incidents = [i for i in issues if i['title'] == TITLE and MARKER in i['body']
-                 and i.get('author', {}).get('login') == 'github-actions[bot]']
+                 and i.get('author', {}).get('login') in ('github-actions[bot]', 'app/github-actions')]
     if failed:
         if not incidents:
             gh('issue', 'create', '--title', TITLE, '--body',

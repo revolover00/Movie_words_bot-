@@ -43,10 +43,10 @@ def localized_caption(text: str, clip, level: str, learning: str, explanation: s
 
 
 
-def select_localized_clip(level: str, learning: str):
+def select_localized_clip(level: str, learning: str, excluded=None):
     """Find an expression and verify its audio before returning its clip."""
     seen, topics = db.phrase_history(level, learning)
-    deadline = time.monotonic() + 120
+    seen = seen | {text.casefold() for text in (excluded or ())}
     if learning in source_first.SEEDS:
         try:
             (text, topic), clip = source_first.find_expression_clip(learning, level, seen, topics)
@@ -54,6 +54,7 @@ def select_localized_clip(level: str, learning: str):
             log.info('No suitable expression found in sampled %s audio', learning)
         else:
             return phrases.Phrase(text, topic), clip
+    deadline = time.monotonic() + 120
     refresh_after_search = False
     if learning == 'en':
         candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]

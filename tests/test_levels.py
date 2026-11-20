@@ -4,6 +4,14 @@ from unittest.mock import AsyncMock
 
 import daily_job
 import phrases
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def no_live_source_requests(monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("test source unavailable")
+    monkeypatch.setattr(daily_job.source_first, "find_expression_clip", unavailable)
 
 
 def test_levels_have_multiple_topics_and_full_expressions():
