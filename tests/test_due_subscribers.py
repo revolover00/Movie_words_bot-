@@ -102,3 +102,12 @@ def test_session_always_closes_connection_after_success_and_failure(monkeypatch)
         raise RuntimeError('transaction failed')
     conn.close.assert_called_once()
     assert conn.__exit__.call_args.args[0] is RuntimeError
+
+
+def test_schema_migrations_lock_before_ddl(monkeypatch):
+    cur = mock_db(monkeypatch)
+    db.init_db()
+    statements = [call.args[0] for call in cur.execute.call_args_list]
+    assert 'pg_advisory_xact_lock' in statements[0]
+    assert 'current_schema()' in statements[0]
+    assert 'CREATE TABLE' in statements[1]
