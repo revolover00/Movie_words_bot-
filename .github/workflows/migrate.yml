@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths: ['schema.sql', 'scheduling.sql', 'reliability.sql']
 concurrency:
-  group: movie-expressions
+  group: database-migrations
   cancel-in-progress: false
 jobs:
   migrate:
