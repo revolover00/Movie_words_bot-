@@ -59,6 +59,10 @@ def init_db() -> None:
         ddl = f.read()
     with session() as conn:
         with conn.cursor() as cur:
+            # Serialize migrations per bot even when delivery initializes in
+            # parallel. Keep the migration workflow out of the delivery queue:
+            # GitHub concurrency retains only one pending run per group.
+            cur.execute("SELECT pg_advisory_xact_lock(hashtext(current_schema()), hashtext('schema-migration'))")
             cur.execute(ddl)
             cur.execute(Path(__file__).with_name('scheduling.sql').read_text(encoding='utf-8'))
             cur.execute(Path(__file__).with_name('reliability.sql').read_text(encoding='utf-8'))
