@@ -115,3 +115,19 @@ The live GitHub CLI represents the Actions author as `app/github-actions`, where
 the initial mock used `github-actions[bot]`. Alert reconciliation now accepts both
 exact trusted identities while retaining marker/title checks; human issues remain
 untouched. This fixes the observed duplicate incidents.
+
+Session correctness is also required, not just transport encryption: this code
+uses `SET search_path` and session-level advisory locks across transactions.
+Recognized Neon `ep-…-pooler.…neon.tech` endpoints are now routed to their direct
+session counterpart in Python and Node. Custom/non-Neon hosts are unchanged.
+Transaction pooling is incompatible with those session assumptions and can cause
+intermittent schema/lock behavior; the first expanded integration failed during
+preparation, so the session-compatible path is tested before rollout. This does
+not retroactively prove pooling caused every earlier missing message.
+
+Saved lessons are restored from their exact stored source page and clip ID, not a
+fresh phrase search which might return another scene first. Identity and audio
+verification remain mandatory. Missing/changed original media still fails safely.
+Content failures now log the safe processing-stage name (`lookup`,
+`restore_saved_media`, `select_new_clip`, `check_unseen`) rather than only an opaque
+exception class.

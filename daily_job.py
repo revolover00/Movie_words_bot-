@@ -109,7 +109,7 @@ def select_localized_clip(level: str, learning: str, excluded=None):
 
 def reload_verified_clip(content):
     """Never attach a saved lesson's caption/source to a different movie clip."""
-    clip = clip_cafe.find_clip(content['phrase'], audio_language=content['learning_language'],
+    clip = clip_cafe.load_clip(content['source_url'], content['phrase'], expected_id=content['clip_id'], audio_language=content['learning_language'],
         verify=lambda path, phrase: multilingual.verify_audio(path, phrase, content['learning_language']))
     if clip.clip_id != content['clip_id']:
         raise RuntimeError('Original lesson clip is unavailable; refusing source substitution')
