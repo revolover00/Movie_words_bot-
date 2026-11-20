@@ -200,3 +200,38 @@ def test_reloading_saved_lesson_cannot_substitute_another_movie(monkeypatch):
     original=SimpleNamespace(clip_id='original')
     monkeypatch.setattr(daily_job.clip_cafe,'find_clip',lambda *args,**kwargs:original)
     assert daily_job.reload_verified_clip(lesson) is original
+
+
+def test_unavailable_unseen_english_bank_refreshes_without_recycling(monkeypatch):
+    monkeypatch.setattr(daily_job.db, 'phrase_history', lambda *args: (set(), []))
+    monkeypatch.setattr(phrases, 'candidates', lambda *args: [phrases.Phrase('Unavailable phrase', 'work')])
+    generated = []
+    def refresh(language, level, excluded, topics):
+        generated.append((language, level, excluded))
+        return [('Unavailable phrase', 'work'), ('A fresh expression', 'discussion')]
+    monkeypatch.setattr(daily_job.multilingual, 'expressions', refresh)
+    queries = []
+    clip = SimpleNamespace(clip_id='verified')
+    def find(text, **kwargs):
+        queries.append(text)
+        assert kwargs['audio_language'] == 'en' and callable(kwargs['verify'])
+        if text == 'Unavailable phrase':
+            raise RuntimeError('no matching audio')
+        return clip
+    monkeypatch.setattr(daily_job.clip_cafe, 'find_clip', find)
+    expression, found = daily_job.select_localized_clip('C1', 'en')
+    assert expression.text == 'A fresh expression' and found is clip
+    assert queries == ['Unavailable phrase', 'A fresh expression']
+    assert generated == [('en', 'C1', {'unavailable phrase'})]
+
+
+def test_fresh_search_failure_never_accepts_unverified_audio(monkeypatch):
+    import pytest
+    monkeypatch.setattr(daily_job.db, 'phrase_history', lambda *args: (set(), []))
+    monkeypatch.setattr(phrases, 'candidates', lambda *args: [])
+    monkeypatch.setattr(daily_job.multilingual, 'expressions', lambda *args: [('Fresh but wrong audio', 'work')])
+    def reject(*args, **kwargs):
+        raise RuntimeError('audio mismatch')
+    monkeypatch.setattr(daily_job.clip_cafe, 'find_clip', reject)
+    with pytest.raises(RuntimeError, match='No verified clip'):
+        daily_job.select_localized_clip('C1', 'en')

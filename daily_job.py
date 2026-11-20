@@ -54,21 +54,28 @@ def select_localized_clip(level: str, learning: str):
             log.info('No suitable expression found in sampled %s audio', learning)
         else:
             return phrases.Phrase(text, topic), clip
+    refresh_after_search = False
     if learning == 'en':
         candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]
         # Once the finite curated bank is exhausted, try new generated
         # expressions before recycling the bank. Clip audio is still verified.
-        if all(p.text.casefold() in seen for p in phrases.BANK[level]):
+        refresh_after_search = not all(p.text.casefold() in seen for p in phrases.BANK[level])
+        if not refresh_after_search:
             try:
                 candidates = multilingual.expressions(learning, level, seen, topics) + candidates
             except Exception:  # noqa: BLE001 - a failed AI refresh falls back to the curated bank
                 log.warning('Could not generate fresh English expressions; using curated bank')
     else:
         candidates = multilingual.expressions(learning, level, seen, topics)
+    attempted = set()
+    # Reserve time for fresh expressions when the remaining curated phrases
+    # have no available verified audio. Unsent does not mean searchable.
+    curated_deadline = deadline - 60 if refresh_after_search else deadline
     for text, topic in candidates:
-        if time.monotonic() >= deadline:
+        if time.monotonic() >= curated_deadline:
             log.warning('Content search budget exhausted for %s/%s', level, learning)
             break
+        attempted.add(text.casefold())
         try:
             clip = clip_cafe.find_clip(
                 text, verify=lambda path, phrase: multilingual.verify_audio(path, phrase, learning),
@@ -77,6 +84,25 @@ def select_localized_clip(level: str, learning: str):
             log.info('No verified audio found for expression %r', text)
             continue
         return phrases.Phrase(text, topic), clip
+    if refresh_after_search and time.monotonic() < deadline:
+        try:
+            fresh = multilingual.expressions(learning, level, seen | attempted, topics)
+        except Exception:  # noqa: BLE001 - fail closed if the provider is unavailable
+            log.warning('Fresh English content unavailable after curated search')
+            fresh = []
+        for text, topic in fresh:
+            if time.monotonic() >= deadline:
+                break
+            if text.casefold() in seen | attempted:
+                continue
+            attempted.add(text.casefold())
+            try:
+                clip = clip_cafe.find_clip(
+                    text, verify=lambda path, phrase: multilingual.verify_audio(path, phrase, learning),
+                    audio_language=learning)
+            except RuntimeError:
+                continue
+            return phrases.Phrase(text, topic), clip
     raise RuntimeError(f'No verified clip for {level}/{learning}')
 
 
