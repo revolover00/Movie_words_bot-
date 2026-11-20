@@ -35,8 +35,9 @@ def test_result_audio_languages_are_indexed():
 
 
 def test_search_includes_audio_and_transcript_language(monkeypatch, tmp_path):
+    from urllib.parse import parse_qs, urlparse
+
     import clip_cafe
-    from urllib.parse import urlparse, parse_qs
     urls = []
     def search(url):
         urls.append(url)
@@ -50,8 +51,9 @@ def test_search_includes_audio_and_transcript_language(monkeypatch, tmp_path):
 
 
 def test_search_falls_back_without_duplicate_clips(monkeypatch):
-    import clip_cafe
     from urllib.parse import parse_qs, urlparse
+
+    import clip_cafe
     calls = []
     def search(url):
         calls.append(parse_qs(urlparse(url).query))
@@ -65,8 +67,9 @@ def test_search_falls_back_without_duplicate_clips(monkeypatch):
 
 
 def test_search_language_can_differ_from_audio(monkeypatch):
-    import clip_cafe
     from urllib.parse import parse_qs, urlparse
+
+    import clip_cafe
     urls = []
     def search(url):
         urls.append(url)
@@ -78,8 +81,9 @@ def test_search_language_can_differ_from_audio(monkeypatch):
 
 
 def test_clip_search_stops_after_time_budget(monkeypatch, tmp_path):
-    import clip_cafe
     import pytest
+
+    import clip_cafe
     ticks = iter([100, 146])
     monkeypatch.setattr(clip_cafe.time, 'monotonic', lambda: next(ticks))
     monkeypatch.setattr(clip_cafe, 'search_links', lambda *args: iter(['movie/a/']))
@@ -90,8 +94,10 @@ def test_clip_search_stops_after_time_budget(monkeypatch, tmp_path):
 
 def test_redirect_policy_rejects_untrusted_destinations():
     from urllib.request import Request
-    from clip_cafe import SafeRedirect
+
     import pytest
+
+    from clip_cafe import SafeRedirect
     req = Request('https://clip.cafe/a')
     for url in ('https://evil.example/', 'http://127.0.0.1/', 'https://clip.cafe:444/a', 'https://u@clip.cafe/a'):
         assert not allowed(url)

@@ -66,10 +66,10 @@ def find_expression_clip(language: str, level: str, seen: set[str], topics: list
     # Bound the search per run so one difficult language cannot stall all users.
     for seed, search_language in seeds[:2]:
         chosen = None
-        def verify(path, search):
+        def verify(path, search, current_search_language=search_language):
             nonlocal chosen
             transcript = multilingual.transcript_for_language(path, language)
-            if transcript is None or (search_language == language and not clip_cafe.matches(search, transcript)):
+            if transcript is None or (current_search_language == language and not clip_cafe.matches(search, transcript)):
                 return False
             chosen = extract_expression(transcript, language, level, seen, topics)
             return chosen is not None

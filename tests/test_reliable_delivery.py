@@ -1,22 +1,23 @@
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from telegram.error import RetryAfter, Forbidden, TimedOut, BadRequest
+from telegram.error import BadRequest, Forbidden, RetryAfter, TimedOut
+
 import reliable_delivery as worker
 
 
 def subscriber(chat=1):
-    return dict(chat_id=chat, due_at=datetime(2026,1,1,tzinfo=timezone.utc),
-                level='B1',learning_language='en',explanation_language='ar',
-                ui_language='ar',settings_updated_at=None)
+    return {'chat_id': chat, 'due_at': datetime(2026,1,1,tzinfo=UTC),
+                'level': 'B1','learning_language': 'en','explanation_language': 'ar',
+                'ui_language': 'ar','settings_updated_at': None}
 
 
 def content():
-    return dict(id=1,telegram_file_id='reusable-file',phrase='Good for you',topic='social',
-                level='B1',learning_language='en',video_title='Movie',source_url='https://example.com',clip_id='1')
+    return {'id': 1,'telegram_file_id': 'reusable-file','phrase': 'Good for you','topic': 'social',
+                'level': 'B1','learning_language': 'en','video_title': 'Movie','source_url': 'https://example.com','clip_id': '1'}
 
 
 def fixture(monkeypatch):
@@ -122,7 +123,7 @@ def test_ledger_write_failure_does_not_retry_telegram(monkeypatch):
 
 def test_failed_send_waits_until_retry_time(monkeypatch):
     bot=fixture(monkeypatch)
-    monkeypatch.setattr(worker.store,'state',lambda _:{'status':'failed','attempts':1,'retry_at':datetime.now(timezone.utc)+timedelta(hours=1),'content_id':1})
+    monkeypatch.setattr(worker.store,'state',lambda _:{'status':'failed','attempts':1,'retry_at':datetime.now(UTC)+timedelta(hours=1),'content_id':1})
     assert run(bot).skipped==1
     bot.send_video.assert_not_called()
 

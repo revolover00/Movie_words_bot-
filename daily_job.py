@@ -7,11 +7,12 @@ import time
 
 from telegram import Bot
 
-import db
-import phrases
 import clip_cafe
+import db
 import multilingual
+import phrases
 import source_first
+from async_file import open_binary_async
 from config import config
 from lessons import caption as render_caption
 
@@ -59,7 +60,7 @@ def select_localized_clip(level: str, learning: str):
         if all(p.text.casefold() in seen for p in phrases.BANK[level]):
             try:
                 candidates = multilingual.expressions(learning, level, seen, topics) + candidates
-            except Exception:
+            except Exception:  # noqa: BLE001 - a failed AI refresh falls back to the curated bank
                 log.warning('Could not generate fresh English expressions; using curated bank')
     else:
         candidates = multilingual.expressions(learning, level, seen, topics)
@@ -87,10 +88,10 @@ async def broadcast(bot: Bot, chat_ids: list[int], clip_path: str, caption: str)
     sent = failed = 0
     for chat_id in chat_ids:
         try:
-            with open(clip_path, 'rb') as video:
+            async with open_binary_async(clip_path) as video:
                 await bot.send_video(chat_id=chat_id, video=video, caption=caption)
             sent += 1
-        except Exception as exc:  # one blocked chat must not stop the group
+        except Exception as exc:  # noqa: BLE001 - one recipient's transport failure must not stop the group
             log.warning('Send to %s failed: %s', chat_id, exc)
             failed += 1
         await asyncio.sleep(config.send_delay)
@@ -185,10 +186,11 @@ async def run_due_subscribers(subscribers: list[dict]) -> None:
         raise RuntimeError(f'Failed to deliver {len(failures)} group(s) or subscriber(s)')
 
 def main() -> None:
+    from contextlib import ExitStack
+
     import delivery_store
     import preparation
-    from contextlib import ExitStack
-    from reliable_delivery import run, Stats
+    from reliable_delivery import Stats, run
 
     config.validate('database_url', 'bot_token')
     db.init_db()
@@ -226,7 +228,7 @@ def main() -> None:
         finally:
             try:
                 delivery_store.record_run(status, len(subscribers), stats.dict(), time.monotonic() - started)
-            except Exception:
+            except Exception:  # noqa: BLE001 - telemetry must not undo or mask delivery outcomes
                 log.warning('Run summary persistence unavailable; consult slot ledger')
                 status = 'failed'
             print(f'::notice title=SceneLingo delivery::{stats.dict()}', flush=True)

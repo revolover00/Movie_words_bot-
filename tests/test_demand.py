@@ -1,12 +1,13 @@
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import AsyncMock, Mock
+
 import daily_job
 
 
 def sub(chat, learning='en', explanation='ar'):
-    return dict(chat_id=chat, level='B1', learning_language=learning,
-                explanation_language=explanation, settings_updated_at=None)
+    return {'chat_id': chat, 'level': 'B1', 'learning_language': learning,
+                'explanation_language': explanation, 'settings_updated_at': None}
 
 
 def test_empty_audience_does_not_construct_bot_or_generate(monkeypatch):
@@ -58,8 +59,9 @@ def test_settings_change_after_content_search_skips_explanation(monkeypatch):
 
 
 def test_idle_scheduler_does_not_require_ai_credentials(monkeypatch):
-    import delivery_store
     from contextlib import nullcontext
+
+    import delivery_store
     monkeypatch.setattr(delivery_store, 'worker_lock', lambda: nullcontext(True))
     validated = []
     monkeypatch.setattr(daily_job, 'config', SimpleNamespace(validate=lambda *names: validated.append(names)))

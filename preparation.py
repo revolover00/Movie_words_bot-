@@ -3,12 +3,12 @@
 Media is bounded to 20 MiB/item and 80 MiB total, expires after 24h, and is
 shared by content ID. This small MVP buffer uses the existing Postgres database.
 """
+import logging
+import time
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-import logging
-import time
 
 import db
 import delivery_store as store
@@ -85,7 +85,7 @@ def _prepare(subscribers, select, explain):
                     raise ValueError('No unseen verified content')
                 if not content['telegram_file_id']:
                     save_media(content['id'], clip.path)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - isolate provider, media, and database failures per audience
             log.warning('Preparation content failed (%s)', type(error).__name__)
             failed += len(audience)
             continue
@@ -106,7 +106,7 @@ def _prepare(subscribers, select, explain):
                     if db.still_due_with_settings(sub, 10):
                         reserve(sub, content['id'])
                         prepared += 1
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - isolate model and database failures per recipient group
                 log.warning('Preparation explanation failed (%s)', type(error).__name__)
                 failed += len(recipients)
     return prepared, failed
@@ -147,5 +147,5 @@ def prepare(subscribers, select, explain):
                 cur.execute("""INSERT INTO preparation_runs(prepared_count,failed_count,duration_seconds)
                     VALUES(%s,%s,%s)""", (prepared, failed, time.monotonic()-started))
                 cur.execute("DELETE FROM preparation_runs WHERE finished_at<now()-interval '30 days'")
-        except Exception:
+        except Exception:  # noqa: BLE001 - failure in best-effort telemetry must not mask preparation
             log.warning('Preparation telemetry unavailable')
