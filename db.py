@@ -17,6 +17,7 @@ from psycopg2 import sql
 
 from bot_identity import database_schema
 from config import config
+from postgres_connection import connect_verified
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def connect():
     """Open a Neon Postgres connection."""
     config.validate("database_url", "bot_token")
     schema = database_schema(config.bot_token)
-    conn = psycopg2.connect(config.database_url)
+    conn = connect_verified(config.database_url)
     try:
         with conn.cursor() as cur:
             cur.execute(sql.SQL('CREATE SCHEMA IF NOT EXISTS {}').format(sql.Identifier(schema)))
