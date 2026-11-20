@@ -77,3 +77,14 @@ def test_idle_scheduler_does_not_require_ai_credentials(monkeypatch):
     assert validated == [('database_url', 'bot_token')]
     run.assert_not_called()
     record.assert_called_once_with('idle', 0)
+
+
+def test_unavailable_worker_lock_is_not_reported_as_healthy_idle(monkeypatch):
+    import pytest
+    import delivery_store
+    from contextlib import nullcontext
+    monkeypatch.setattr(delivery_store, 'worker_lock', lambda: nullcontext(False))
+    monkeypatch.setattr(daily_job, 'config', SimpleNamespace(validate=lambda *args: None))
+    monkeypatch.setattr(daily_job.db, 'init_db', lambda: None)
+    with pytest.raises(RuntimeError, match='lock unavailable'):
+        daily_job.main()

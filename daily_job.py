@@ -233,8 +233,7 @@ def main() -> None:
     db.init_db()
     with delivery_store.worker_lock() as acquired:
         if not acquired:
-            log.info('Another delivery worker owns this bot; skipping')
-            return
+            raise RuntimeError('Delivery worker lock unavailable; retry rather than reporting an idle success')
         preparation.cleanup()
         subscribers = db.due_subscribers()
         if not subscribers:

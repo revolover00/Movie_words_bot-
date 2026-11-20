@@ -111,3 +111,15 @@ def test_schema_migrations_lock_before_ddl(monkeypatch):
     assert 'pg_advisory_xact_lock' in statements[0]
     assert 'current_schema()' in statements[0]
     assert 'CREATE TABLE' in statements[1]
+
+
+def test_worker_lock_uses_new_session_namespace_and_always_closes(monkeypatch):
+    import delivery_store
+    conn = MagicMock()
+    conn.cursor.return_value.__enter__.return_value.fetchone.return_value = (True,)
+    monkeypatch.setattr(delivery_store.db, 'connect', lambda: conn)
+    with delivery_store.worker_lock() as acquired:
+        assert acquired
+    sql = conn.cursor.return_value.__enter__.return_value.execute.call_args_list[0].args[0]
+    assert 'pg_try_advisory_lock' in sql and '7195' in sql and '7194' not in sql
+    conn.close.assert_called_once()
