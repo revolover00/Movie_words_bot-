@@ -48,7 +48,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           SEND_NOW: ${{ github.event_name == 'workflow_dispatch' && inputs.send_now }}
-        run: python scripts/prepare_delivery.py
+        run: python scripts/run_daily_with_diagnostics.py scripts/prepare_delivery.py
 
       - name: Run daily job
         env:
@@ -70,7 +70,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        run: python scripts/check_delivery_health.py
+        run: python scripts/run_daily_with_diagnostics.py scripts/check_delivery_health.py
 
   alert:
     # Branch validation/manual probes must not open or close production incidents.
