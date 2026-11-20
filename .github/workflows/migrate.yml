@@ -22,3 +22,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python -c 'import db; db.init_db()'
+      - name: Verify real database session isolation and lock release
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python scripts/run_daily_with_diagnostics.py scripts/check_database_sessions.py

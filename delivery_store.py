@@ -12,10 +12,13 @@ import db
 @contextmanager
 def worker_lock():
     """Session advisory lock also serializes workers outside the Actions queue."""
+    # New lock namespace: the old transaction-pooled endpoint could strand
+    # session locks on pooled backends after the worker exited. Direct session
+    # connections now guarantee close() releases this lock.
     conn = db.connect()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT pg_try_advisory_lock(hashtext(current_schema()), 7194)")
+            cur.execute("SELECT pg_try_advisory_lock(hashtext(current_schema()), 7195)")
             locked = cur.fetchone()[0]
         if locked:
             # A terminated worker may have sent before dying. Never auto-replay it.

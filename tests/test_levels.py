@@ -4,6 +4,14 @@ from unittest.mock import AsyncMock
 
 import daily_job
 import phrases
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def no_live_source_requests(monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("test source unavailable")
+    monkeypatch.setattr(daily_job.source_first, "find_expression_clip", unavailable)
 
 
 def test_levels_have_multiple_topics_and_full_expressions():
@@ -193,12 +201,12 @@ def test_failed_explanation_does_not_block_other_languages(monkeypatch):
 
 def test_reloading_saved_lesson_cannot_substitute_another_movie(monkeypatch):
     import pytest
-    lesson={'phrase':'Good for you','learning_language':'en','clip_id':'original'}
-    monkeypatch.setattr(daily_job.clip_cafe,'find_clip',lambda *args,**kwargs:SimpleNamespace(clip_id='different'))
+    lesson={'phrase':'Good for you','learning_language':'en','clip_id':'original','source_url':'https://clip.cafe/original/'}
+    monkeypatch.setattr(daily_job.clip_cafe,'load_clip',lambda *args,**kwargs:SimpleNamespace(clip_id='different'))
     with pytest.raises(RuntimeError,match='source substitution'):
         daily_job.reload_verified_clip(lesson)
     original=SimpleNamespace(clip_id='original')
-    monkeypatch.setattr(daily_job.clip_cafe,'find_clip',lambda *args,**kwargs:original)
+    monkeypatch.setattr(daily_job.clip_cafe,'load_clip',lambda *args,**kwargs:original)
     assert daily_job.reload_verified_clip(lesson) is original
 
 

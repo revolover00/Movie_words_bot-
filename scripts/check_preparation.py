@@ -17,6 +17,7 @@ import psycopg2
 from psycopg2 import sql
 
 import db
+import content_reserve
 import preparation
 import reliable_delivery
 from config import config
@@ -56,7 +57,9 @@ def main():
             assert db.due_subscribers(10) == []
             future = db.due_subscribers(preparation.LOOKAHEAD_MINUTES)
             assert len(future) == 1
-            assert preparation.prepare(future, select, explain) == (1,0)
+            initial = preparation.prepare(future, select, explain)
+            print(f'::notice title=Initial preparation::prepared={initial[0]}, failed={initial[1]}', flush=True)
+            assert initial == (1,0)
             assert preparation.ready(future[0])
             # Simulate a different Actions runner: original local media disappears.
             path.unlink()
@@ -105,6 +108,48 @@ def main():
             explain.assert_called_once()
             assert bot.send_video.call_count == 2
             assert db.due_subscribers() == []
+        # Cold-start reserve: build three durable lessons without a Telegram call,
+        # then consume them at three independent due slots on fresh runner media.
+        with db.session() as conn, conn.cursor() as cur:
+            cur.execute("INSERT INTO subscribers(chat_id,level) VALUES(3,'C1')")
+            cur.execute("INSERT INTO subscriber_preferences(chat_id,next_due_at,interval_minutes) VALUES(3,now()+interval '25 minutes',30)")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'stock.mp4'
+            path.write_bytes(b'previously-verified-reserve-fixture')
+            counter = []
+            def select_stock(level, learning, excluded):
+                number = len(counter) + 1
+                text = f'Unique reserve expression {number}'
+                assert text.casefold() not in excluded
+                counter.append(number)
+                return (SimpleNamespace(text=text,topic='discussion'),
+                    SimpleNamespace(path=path,clip_id=f'stock-{number}',title='Stock fixture',url='https://example.com/stock'))
+            upcoming = [s for s in db.due_subscribers(30) if s['chat_id']==3]
+            for _ in range(3):
+                assert content_reserve.refill(upcoming, select_stock, explain) == (1,0)
+            assert content_reserve.stock(upcoming[0]) == 3
+            assert content_reserve.refill(upcoming, select_stock, explain) == (0,0)
+            assert len(counter) == 3
+            path.unlink()
+            bot.send_video.reset_mock()
+            stats = asyncio.run(reliable_delivery.run(upcoming, bot, fallback, fallback, fallback,
+                shared_queue=True))
+            assert stats.sent == 0
+            bot.send_video.assert_not_called()
+            for _ in range(3):
+                with db.session() as conn, conn.cursor() as cur:
+                    cur.execute("UPDATE subscriber_preferences SET next_due_at=now()-interval '1 minute' WHERE chat_id=3")
+                audience = [s for s in db.due_subscribers() if s['chat_id']==3]
+                with ExitStack() as media:
+                    def restore_stock(content):
+                        return media.enter_context(preparation.restore(content, fallback))
+                    result = asyncio.run(reliable_delivery.run(audience, bot, fallback, fallback, restore_stock,
+                        shared_queue=True))
+                    assert result.sent == 1
+            assert len(counter) == 3
+            assert content_reserve.stock(upcoming[0]) == 0
+            assert bot.send_video.call_count == 3
+            print('::notice title=Reserve lifecycle::Three complete lessons built without sending; no early send; local files deleted; three due slots consumed from durable stock with NO provider calls; stock and receipts verified in isolated Postgres')
         print('::notice title=Preparation integration::Real isolated Postgres: persisted media restored after local deletion, no early send, two simulated deliveries across 30-minute/daily intervals, no repeated generation; no real Telegram calls')
     finally:
         db.connect = original

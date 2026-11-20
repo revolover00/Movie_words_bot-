@@ -43,10 +43,10 @@ def localized_caption(text: str, clip, level: str, learning: str, explanation: s
 
 
 
-def select_localized_clip(level: str, learning: str):
+def select_localized_clip(level: str, learning: str, excluded=None):
     """Find an expression and verify its audio before returning its clip."""
     seen, topics = db.phrase_history(level, learning)
-    deadline = time.monotonic() + 120
+    seen = seen | {text.casefold() for text in (excluded or ())}
     if learning in source_first.SEEDS:
         try:
             (text, topic), clip = source_first.find_expression_clip(learning, level, seen, topics)
@@ -54,6 +54,7 @@ def select_localized_clip(level: str, learning: str):
             log.info('No suitable expression found in sampled %s audio', learning)
         else:
             return phrases.Phrase(text, topic), clip
+    deadline = time.monotonic() + 120
     refresh_after_search = False
     if learning == 'en':
         candidates = [(p.text, p.topic) for p in phrases.candidates(level, seen, topics)]
@@ -108,7 +109,7 @@ def select_localized_clip(level: str, learning: str):
 
 def reload_verified_clip(content):
     """Never attach a saved lesson's caption/source to a different movie clip."""
-    clip = clip_cafe.find_clip(content['phrase'], audio_language=content['learning_language'],
+    clip = clip_cafe.load_clip(content['source_url'], content['phrase'], expected_id=content['clip_id'], audio_language=content['learning_language'],
         verify=lambda path, phrase: multilingual.verify_audio(path, phrase, content['learning_language']))
     if clip.clip_id != content['clip_id']:
         raise RuntimeError('Original lesson clip is unavailable; refusing source substitution')
@@ -232,8 +233,7 @@ def main() -> None:
     db.init_db()
     with delivery_store.worker_lock() as acquired:
         if not acquired:
-            log.info('Another delivery worker owns this bot; skipping')
-            return
+            raise RuntimeError('Delivery worker lock unavailable; retry rather than reporting an idle success')
         preparation.cleanup()
         subscribers = db.due_subscribers()
         if not subscribers:

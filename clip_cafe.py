@@ -164,6 +164,60 @@ def search_links(phrase: str, audio_language: str | None, search_language: str |
                 yield link
 
 
+def load_clip(url: str, phrase: str, out_dir: Path = Path('clips'), *, verify=None,
+              audio_language=None, expected_id=None) -> Clip:
+    """Restore a specific source page without searching or substituting scenes."""
+    if not allowed(url):
+        raise ValueError('Unexpected clip source')
+    details = page(url)
+    quote = details.meta.get('og:description', '')
+    title = details.meta.get('og:title', '')
+    video_url = details.meta.get('og:video:secure_url') or details.meta.get('og:video', '')
+    if (verify is None and not matches(phrase, quote)) or not allowed(video_url):
+        raise ValueError("Clip metadata or audio verification rejected")
+    # Movie title appears after the separator in the page title.
+    movie = title.rsplit('|', 1)[-1].strip().removesuffix(' scene').strip() or 'Film'
+    slug = urlparse(video_url).path.rsplit('/', 1)[-1].removesuffix('.mp4')
+    if not re.fullmatch(r'[A-Za-z0-9_-]+', slug) or (expected_id is not None and slug != expected_id):
+        raise ValueError("Clip metadata or audio verification rejected")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f'clipcafe-{slug}.mp4'
+    localized = False
+    if audio_language and verify is not None:
+        from hls_clips import download_localized
+        localized = download_localized(slug, audio_language, path)
+    if not localized:
+        with get(video_url) as video:
+            if not allowed(video.url):
+                raise ValueError('Unexpected video redirect')
+            size = 0
+            try:
+                with path.open('wb') as output:
+                    for chunk in iter(lambda: video.read(65536), b''):
+                        size += len(chunk)
+                        if size > MAX_BYTES:
+                            raise ValueError('Clip exceeds size limit')
+                        output.write(chunk)
+                with path.open('rb') as f:
+                    if size < 1024 or b'ftyp' not in f.read(64):
+                        raise ValueError('Invalid MP4')
+            except Exception:
+                path.unlink(missing_ok=True)
+                raise
+    if verify is not None:
+        try:
+            verified = verify(path, phrase)
+        except Exception:
+            path.unlink(missing_ok=True)
+            raise
+        if not verified:
+            path.unlink(missing_ok=True)
+            log.info('Audio did not match the requested expression in clip %s', slug)
+            raise ValueError("Clip metadata or audio verification rejected")
+    log.info('Selected Clip.Cafe clip %s: %s', slug, movie)
+    return Clip(slug, movie, quote, url, path)
+
+
 def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_language: str | None = None, search_language: str | None = None, max_results: int = 15, max_seconds: int = 45) -> Clip:
     deadline = time.monotonic() + max_seconds
     for link in search_links(phrase, audio_language, search_language, max_results):
@@ -173,53 +227,7 @@ def find_clip(phrase: str, out_dir: Path = Path('clips'), *, verify=None, audio_
         if not allowed(url):
             continue
         try:
-            details = page(url)
-            quote = details.meta.get('og:description', '')
-            title = details.meta.get('og:title', '')
-            video_url = details.meta.get('og:video:secure_url') or details.meta.get('og:video', '')
-            if (verify is None and not matches(phrase, quote)) or not allowed(video_url):
-                continue
-            # Movie title appears after the separator in the page title.
-            movie = title.rsplit('|', 1)[-1].strip().removesuffix(' scene').strip() or 'Film'
-            slug = urlparse(video_url).path.rsplit('/', 1)[-1].removesuffix('.mp4')
-            if not re.fullmatch(r'[A-Za-z0-9_-]+', slug):
-                continue
-            out_dir.mkdir(parents=True, exist_ok=True)
-            path = out_dir / f'clipcafe-{slug}.mp4'
-            localized = False
-            if audio_language and verify is not None:
-                from hls_clips import download_localized
-                localized = download_localized(slug, audio_language, path)
-            if not localized:
-                with get(video_url) as video:
-                    if not allowed(video.url):
-                        raise ValueError('Unexpected video redirect')
-                    size = 0
-                    try:
-                        with path.open('wb') as output:
-                            for chunk in iter(lambda: video.read(65536), b''):
-                                size += len(chunk)
-                                if size > MAX_BYTES:
-                                    raise ValueError('Clip exceeds size limit')
-                                output.write(chunk)
-                        with path.open('rb') as f:
-                            if size < 1024 or b'ftyp' not in f.read(64):
-                                raise ValueError('Invalid MP4')
-                    except Exception:
-                        path.unlink(missing_ok=True)
-                        raise
-            if verify is not None:
-                try:
-                    verified = verify(path, phrase)
-                except Exception:
-                    path.unlink(missing_ok=True)
-                    raise
-                if not verified:
-                    path.unlink(missing_ok=True)
-                    log.info('Audio did not match the requested expression in clip %s', slug)
-                    continue
-            log.info('Selected Clip.Cafe clip %s: %s', slug, movie)
-            return Clip(slug, movie, quote, url, path)
+            return load_clip(url, phrase, out_dir, verify=verify, audio_language=audio_language)
         except (URLError, ValueError, OSError) as exc:
             log.warning('Could not use clip %s: %s', url, exc)
     raise RuntimeError(f'No downloadable clip matching {phrase!r} found on Clip.Cafe')

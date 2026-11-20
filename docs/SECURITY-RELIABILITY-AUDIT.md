@@ -85,3 +85,59 @@ throttling and missing Python dependency scan items. Still outside software-only
 closure: provider availability/quotas, external scheduling precision, independent
 penetration testing, rights to media and revocation of previously exposed secrets.
 No automatic replay of uncertain Telegram sends has been introduced.
+
+## Recurring content starvation: structural correction
+
+The next real scheduled run still failed before `sendVideo`: there was no verified
+unseen C1 English lesson. Increasing lookahead or generating another exact phrase
+had not removed the underlying dependency on a scarce exact movie quote. A green
+idle run, or a single recovered send, was insufficient evidence of steady supply.
+
+English selection now also uses the source-first path: download available speech,
+verify its language, and select a level-appropriate contiguous expression from its
+actual transcript. Search seeds are hints, not the lesson text. The selected text
+must still occur in the transcript, be multiword, and not already be used/reserved.
+The approximate model-assigned CEFR level is not an independent certification.
+
+A demand-only reserve targets **three ready unseen lessons per learner**. Each
+scheduled invocation attempts at most one refill, after due delivery, using the
+existing 80 MiB/24-hour durable media budget and reusable Telegram file cache.
+Only active, setup-complete subscribers due within a day cause work. Each lesson
+needs its requested-language caption before it counts as ready. Partial captions
+resume on the same media. No refill sends, claims a slot, or changes a schedule.
+At delivery time the existing oldest-unseen queue can use this stock without
+search/transcription/explanation calls. Failed refill remains visible, not silently
+reported as healthy. Different groups are prioritized by lowest available stock.
+This is a **target**, not a claim that three lessons always exist: provider outages,
+quotas or a full media budget can still prevent replenishment.
+
+The live GitHub CLI represents the Actions author as `app/github-actions`, whereas
+the initial mock used `github-actions[bot]`. Alert reconciliation now accepts both
+exact trusted identities while retaining marker/title checks; human issues remain
+untouched. This fixes the observed duplicate incidents.
+
+Session correctness is also required, not just transport encryption: this code
+uses `SET search_path` and session-level advisory locks across transactions.
+Recognized Neon `ep-…-pooler.…neon.tech` endpoints are now routed to their direct
+session counterpart in Python and Node. Custom/non-Neon hosts are unchanged.
+Transaction pooling is incompatible with those session assumptions and can cause
+intermittent schema/lock behavior; the first expanded integration failed during
+preparation, so the session-compatible path is tested before rollout. This does
+not retroactively prove pooling caused every earlier missing message.
+
+Saved lessons are restored from their exact stored source page and clip ID, not a
+fresh phrase search which might return another scene first. Identity and audio
+verification remain mandatory. Missing/changed original media still fails safely.
+Content failures now log the safe processing-stage name (`lookup`,
+`restore_saved_media`, `select_new_clip`, `check_unseen`) rather than only an opaque
+exception class.
+
+The direct-connection rollout also exposed a refused worker lock in the real
+workflow. Legacy transaction-pooled session locks may remain on pooled backends,
+so direct-session workers use a fresh namespace, **7195**, instead of 7194. No
+pooled backend is terminated and no uncertain delivery is replayed. Failure to
+acquire the lock now fails visibly rather than returning a misleading idle success.
+The database migration workflow includes a two-connection, randomly namespaced
+check: session settings survive commits independently, a simultaneous lock is
+refused, and disconnecting its owner releases it. This does not touch subscriber
+tables or actual worker lock keys.

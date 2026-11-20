@@ -57,3 +57,9 @@ def test_unresolved_send_keeps_incident_open_without_replay(monkeypatch):
     with pytest.raises(RuntimeError, match='unresolved'):
         health.check()
     assert all(call.args[0].lstrip().startswith('SELECT') for call in cur.execute.call_args_list)
+
+
+def test_github_app_author_format_is_deduplicated(monkeypatch):
+    app_issue = incident(); app_issue['author'] = {'login': 'app/github-actions'}
+    monkeypatch.setattr(alert, 'gh', lambda *args: json.dumps([app_issue]) if args[1] == 'list' else pytest.fail('duplicate alert'))
+    alert.reconcile(True, 'run')

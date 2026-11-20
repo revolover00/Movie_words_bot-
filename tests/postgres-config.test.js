@@ -11,3 +11,8 @@ test('database URLs cannot disable TLS certificate verification',()=>{
  assert.equal(url.searchParams.get('application_name'),'test');
  assert.equal(options.statement_timeout,15000);
 });
+test('session-scoped schema and locks use Neon direct endpoint, not transaction pooler',()=>{
+ const url=new URL(postgresOptions('postgresql://u:p@ep-example-pooler.eu-central-1.aws.neon.tech/db').connectionString);
+ assert.equal(url.hostname,'ep-example.eu-central-1.aws.neon.tech');
+ assert.equal(new URL(postgresOptions('postgresql://u:p@pooler.example.com/db').connectionString).hostname,'pooler.example.com');
+});

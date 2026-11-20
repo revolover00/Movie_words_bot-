@@ -134,3 +134,29 @@ def test_unambiguous_english_contractions_match_without_fuzzy_words():
     assert not clip_cafe.matches('I can do it', "I can't do it")
     assert not clip_cafe.matches('He had left', "He'd left")
     assert not clip_cafe.matches('There is no point in arguing', "There's no reason for arguing")
+
+
+def test_saved_scene_is_loaded_directly_with_identity_and_audio_checks(monkeypatch, tmp_path):
+    from io import BytesIO
+    from types import SimpleNamespace
+    import clip_cafe
+    import hls_clips
+    parser = PageParser()
+    parser.meta = {'og:description': 'An exact phrase', 'og:title': 'Scene | Film',
+                   'og:video': 'https://clip.cafe/videos/original.mp4'}
+    monkeypatch.setattr(clip_cafe, 'page', lambda url: parser)
+    monkeypatch.setattr(clip_cafe, 'search_links', lambda *args: (_ for _ in ()).throw(AssertionError('must not search')))
+    monkeypatch.setattr(hls_clips, 'download_localized', lambda *args: False)
+    def download(url):
+        stream = BytesIO(b'\0\0\0\x18ftyp' + b'0'*2000)
+        stream.url = url
+        return stream
+    monkeypatch.setattr(clip_cafe, 'get', download)
+    checked = []
+    clip = clip_cafe.load_clip('https://clip.cafe/source/', 'An exact phrase', tmp_path,
+        expected_id='original', audio_language='en', verify=lambda path, text: checked.append(text) or True)
+    assert clip.clip_id == 'original' and checked == ['An exact phrase']
+    import pytest
+    with pytest.raises(ValueError):
+        clip_cafe.load_clip('https://clip.cafe/source/', 'An exact phrase', tmp_path,
+            expected_id='different', verify=lambda *args: pytest.fail('wrong scene'))

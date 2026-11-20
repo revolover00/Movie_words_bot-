@@ -118,6 +118,7 @@ async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepar
             continue
         sent_before = stats.sent
         local_clip = None
+        stage = 'lookup'
         try:
             content = store.get_content(pinned) if pinned else store.cached(level, learning, [s['chat_id'] for s in audience])
             if content:
@@ -125,16 +126,19 @@ async def run(subscribers, bot, select, explain, reload_clip, stats=None, prepar
                     stats.cache_hits += 1
                 else:
                     stats.content_requests += 1
+                    stage = 'restore_saved_media'
                     local_clip = reload_clip(content)
             else:
                 stats.content_requests += 1
+                stage = 'select_new_clip'
                 expression, local_clip = select(level, learning)
                 content = store.content(expression, local_clip, level, learning)
+                stage = 'check_unseen'
                 if store.seen_by(content['id'], [s['chat_id'] for s in audience]):
                     raise RuntimeError('No unseen verified content for this audience')
         except Exception as error:  # noqa: BLE001 - isolate external content-provider failures per group
             # Store only a classified outcome; never leak source URLs or secrets.
-            log.warning('Content unavailable for %s/%s (%s)', level, learning, type(error).__name__)
+            log.warning('Content unavailable for %s/%s at %s (%s)', level, learning, stage, type(error).__name__)
             stats.failed += len(audience)
             continue
         invalid_cached = False
