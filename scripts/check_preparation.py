@@ -84,6 +84,10 @@ def main():
                 cur.execute("SELECT count(*) FROM delivery_attempts WHERE status='sent'")
                 assert cur.fetchone()[0] == 1
             assert db.due_subscribers() == []
+            # Freeze the completed fixture away from the next :00/:30 boundary.
+            # Otherwise a slow integration run can legitimately make it due again.
+            with db.session() as conn, conn.cursor() as cur:
+                cur.execute("UPDATE subscriber_preferences SET next_due_at=now()+interval '1 day' WHERE chat_id=1")
             # A daily subscriber later consumes the same persisted lesson.
             with db.session() as conn, conn.cursor() as cur:
                 cur.execute("INSERT INTO subscribers(chat_id,level) VALUES(2,'B1')")
@@ -93,6 +97,7 @@ def main():
                     return media.enter_context(preparation.restore(content, fallback))
                 later = asyncio.run(reliable_delivery.run(db.due_subscribers(), bot, select, explain, restore_later,
                                     prepared_lookup=preparation.ready, shared_queue=True))
+            print(f'::notice title=Shared fixture delivery::{later.dict()}', flush=True)
             assert later.sent == 1
             select.assert_called_once()
             explain.assert_called_once()
