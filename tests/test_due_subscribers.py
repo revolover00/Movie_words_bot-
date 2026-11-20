@@ -49,7 +49,7 @@ def test_preflight_checks_current_level_preferences_and_due_time(monkeypatch):
     assert 's.is_active = TRUE' in sql and 's.level = %s' in sql
     assert "LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'" in sql
     assert 'IS NOT DISTINCT FROM' in sql and '<= now()' in sql
-    assert params == (1, 'B1', 'ja', 'ar', 'v', 0)
+    assert params == (1, 'B1', 'ja', 'ar', 'v', None, None, 0)
 
 
 def test_advance_changed_settings_only_when_current_schedule_is_overdue(monkeypatch):
@@ -79,3 +79,26 @@ def test_due_query_has_only_bound_percent_placeholders(monkeypatch):
         sql, params = cur.execute.call_args.args
         assert sql.count('%s') == len(params)
         assert '%' not in sql.replace('%s', '').replace('%%', '')
+
+
+def test_preflight_pins_exact_slot_even_with_unchanged_settings(monkeypatch):
+    cur=mock_db(monkeypatch,row=(1,))
+    sub=dict(chat_id=1,level='C1',learning_language='en',explanation_language='ar',settings_updated_at='v',due_at='2026-11-20T10:00:00Z')
+    assert db.still_due_with_settings(sub)
+    query,params=cur.execute.call_args.args
+    assert '%s::timestamptz' in query
+    assert params[-3:-1]==(sub['due_at'],sub['due_at'])
+
+
+def test_session_always_closes_connection_after_success_and_failure(monkeypatch):
+    from unittest.mock import MagicMock
+    import pytest
+    conn=MagicMock();monkeypatch.setattr(db,'connect',lambda:conn)
+    with db.session() as actual:
+        assert actual is conn
+    conn.close.assert_called_once()
+    conn.reset_mock()
+    with pytest.raises(RuntimeError), db.session():
+        raise RuntimeError('transaction failed')
+    conn.close.assert_called_once()
+    assert conn.__exit__.call_args.args[0] is RuntimeError

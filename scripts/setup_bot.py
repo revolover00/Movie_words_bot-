@@ -41,7 +41,7 @@ def main():
         print('::notice title=Bot profile::Name, descriptions, commands and menu applied and verified; webhook unchanged', flush=True)
         return
     db.init_db()
-    with db.connect() as conn, conn.cursor() as cur:
+    with db.session() as conn, conn.cursor() as cur:
         cur.execute('SELECT count(*), count(*) FILTER (WHERE is_active) FROM subscribers')
         total, active = cur.fetchone()
     url = os.environ.get('WEBHOOK_URL', 'https://scenelingoo.vercel.app/api/telegram')

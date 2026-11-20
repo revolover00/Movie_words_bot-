@@ -167,3 +167,16 @@ def test_settings_change_during_preparation_prevents_reservation(monkeypatch):
     assert prep.prepare([subscriber()], select, explain) == (0, 0)
     prep.reserve.assert_not_called()
     explain.assert_not_called()
+
+
+def test_media_read_is_bounded_even_if_file_grows_after_stat(monkeypatch):
+    import pytest
+    from unittest.mock import MagicMock
+    path=MagicMock()
+    path.stat.return_value.st_size=1
+    stream=path.open.return_value.__enter__.return_value
+    stream.read.return_value=b'x'*(prep.MAX_ITEM+1)
+    monkeypatch.setattr(prep,'Path',lambda _:path)
+    with pytest.raises(ValueError,match='grew'):
+        prep.save_media(1,'growing.mp4')
+    stream.read.assert_called_once_with(prep.MAX_ITEM+1)

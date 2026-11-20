@@ -189,3 +189,14 @@ def test_failed_explanation_does_not_block_other_languages(monkeypatch):
     with pytest.raises(RuntimeError):
         asyncio.run(daily_job.run_due_subscribers(users))
     assert sent == [2] and len(marked) == 1
+
+
+def test_reloading_saved_lesson_cannot_substitute_another_movie(monkeypatch):
+    import pytest
+    lesson={'phrase':'Good for you','learning_language':'en','clip_id':'original'}
+    monkeypatch.setattr(daily_job.clip_cafe,'find_clip',lambda *args,**kwargs:SimpleNamespace(clip_id='different'))
+    with pytest.raises(RuntimeError,match='source substitution'):
+        daily_job.reload_verified_clip(lesson)
+    original=SimpleNamespace(clip_id='original')
+    monkeypatch.setattr(daily_job.clip_cafe,'find_clip',lambda *args,**kwargs:original)
+    assert daily_job.reload_verified_clip(lesson) is original
