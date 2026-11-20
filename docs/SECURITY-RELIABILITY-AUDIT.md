@@ -85,3 +85,33 @@ throttling and missing Python dependency scan items. Still outside software-only
 closure: provider availability/quotas, external scheduling precision, independent
 penetration testing, rights to media and revocation of previously exposed secrets.
 No automatic replay of uncertain Telegram sends has been introduced.
+
+## Recurring content starvation: structural correction
+
+The next real scheduled run still failed before `sendVideo`: there was no verified
+unseen C1 English lesson. Increasing lookahead or generating another exact phrase
+had not removed the underlying dependency on a scarce exact movie quote. A green
+idle run, or a single recovered send, was insufficient evidence of steady supply.
+
+English selection now also uses the source-first path: download available speech,
+verify its language, and select a level-appropriate contiguous expression from its
+actual transcript. Search seeds are hints, not the lesson text. The selected text
+must still occur in the transcript, be multiword, and not already be used/reserved.
+The approximate model-assigned CEFR level is not an independent certification.
+
+A demand-only reserve targets **three ready unseen lessons per learner**. Each
+scheduled invocation attempts at most one refill, after due delivery, using the
+existing 80 MiB/24-hour durable media budget and reusable Telegram file cache.
+Only active, setup-complete subscribers due within a day cause work. Each lesson
+needs its requested-language caption before it counts as ready. Partial captions
+resume on the same media. No refill sends, claims a slot, or changes a schedule.
+At delivery time the existing oldest-unseen queue can use this stock without
+search/transcription/explanation calls. Failed refill remains visible, not silently
+reported as healthy. Different groups are prioritized by lowest available stock.
+This is a **target**, not a claim that three lessons always exist: provider outages,
+quotas or a full media budget can still prevent replenishment.
+
+The live GitHub CLI represents the Actions author as `app/github-actions`, whereas
+the initial mock used `github-actions[bot]`. Alert reconciliation now accepts both
+exact trusted identities while retaining marker/title checks; human issues remain
+untouched. This fixes the observed duplicate incidents.
