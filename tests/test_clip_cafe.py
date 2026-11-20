@@ -117,3 +117,20 @@ def test_bounded_search_samples_beyond_top_results(monkeypatch):
     monkeypatch.setattr(clip_cafe, 'page', lambda url: p)
     monkeypatch.setattr(clip_cafe.random, 'sample', lambda population, k: population[-k:])
     assert list(clip_cafe.search_links('hi', None, limit=6)) == ['0', '1', '2', '17', '18', '19']
+
+
+def test_unambiguous_english_contractions_match_without_fuzzy_words():
+    import clip_cafe
+    for formal, spoken in [
+        ('Let us cut to the chase', "Let's cut to the chase."),
+        ('You are jumping to conclusions', 'You’re jumping to conclusions!'),
+        ('There is no point in arguing', "There's no point in arguing."),
+        ('That is beside the point', "That's beside the point."),
+        ('It is a blessing in disguise', "It's a blessing in disguise."),
+        ('Do not beat around the bush', "Don't beat around the bush."),
+        ('I will take your word for it', "I'll take your word for it."),
+    ]:
+        assert clip_cafe.matches(formal, spoken)
+    assert not clip_cafe.matches('I can do it', "I can't do it")
+    assert not clip_cafe.matches('He had left', "He'd left")
+    assert not clip_cafe.matches('There is no point in arguing', "There's no reason for arguing")

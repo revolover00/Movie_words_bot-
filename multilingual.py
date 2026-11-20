@@ -11,6 +11,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from ai_observability import tracked
+import audio_cache
 from clip_cafe import matches
 from config import config
 from lessons import parse_lesson, render_lesson
@@ -135,6 +136,11 @@ def transcript_for_language(path: Path, language: str) -> str | None:
     validate_language(language)
     if not likely_audio_language(path, language):
         return None
+    audio_hash = audio_cache.key(path)
+    cached = audio_cache.get(audio_hash)
+    if cached:
+        detected, text = cached
+        return text if detected in DETECTED_NAMES[language] and text.strip() else None
     with path.open('rb') as video:
         transcript = tracked('transcription', client().audio.transcriptions.create,
             model='whisper-large-v3-turbo', file=video,
@@ -142,6 +148,8 @@ def transcript_for_language(path: Path, language: str) -> str | None:
         )
     detected = (getattr(transcript, 'language', '') or '').casefold()
     text = getattr(transcript, 'text', '') or ''
+    if detected and text.strip():
+        audio_cache.save(audio_hash, detected, text)
     return text if detected in DETECTED_NAMES[language] and text.strip() else None
 
 
