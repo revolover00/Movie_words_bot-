@@ -1,5 +1,10 @@
 # SceneLingo 🎬
 
+[![CI](https://github.com/revolover00/scenelingo/actions/workflows/test.yml/badge.svg)](https://github.com/revolover00/scenelingo/actions/workflows/test.yml)
+[![License: Proprietary](https://img.shields.io/badge/License-All%20Rights%20Reserved-red.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/revolover00/scenelingo?style=social)](https://github.com/revolover00/scenelingo/stargazers)
+[![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram)](https://t.me/scenelingo_bot)
+
 A Telegram bot for useful expressions with matching short movie clips and explanations. Subscribers choose a CEFR level, learning language, explanation language and delivery interval inside Telegram.
 
 > Learn languages by watching movies — expressions for your level, zero self-hosting.
@@ -403,21 +408,3 @@ still apply. If no matching reusable lesson exists, verified on-demand generatio
 remains the fallback. This reduces redundant media/AI work, not the number of cron
 checks or Telegram sends. It does not create missing verified content or reduce
 quality/level to fill a gap.
-
-
-### Audio verification reliability
-
-English matching normalizes a conservative set of contractions (for example
-`let's` / `let us`, `you're` / `you are`) before exact contiguous word matching.
-Negation, word order and target-language checks remain mandatory; ambiguous
-contractions are not generally expanded and no fuzzy semantic match is used.
-
-Successful movie-audio transcripts are cached by content hash and transcription
-model in the bot's database for seven days (up to 1000 rows, 12000 characters per
-transcript). The cache contains movie speech, not subscriber messages. A cached
-transcript is still checked against the requested language and phrase on every
-use. Provider failures and empty transcripts are not cached. This reduces repeated
-Whisper calls for the same source clip, but cannot guarantee provider quota or
-verified clip availability. Preparation after a due-delivery attempt now considers
-only future slots, avoiding immediate duplicate searches for the same failed due
-slot during one worker invocation.
