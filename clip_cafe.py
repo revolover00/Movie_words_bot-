@@ -70,6 +70,31 @@ def page(url):
     return parser
 
 
+def normalize_contractions(text: str) -> str:
+    """Expand unambiguous English contractions; retain strict word order/negation.
+
+    Ambiguous 's / 'd forms are intentionally left alone except a small set of
+    unmistakable predicate contexts. This is not fuzzy or semantic matching.
+    """
+    text = text.casefold().replace('’', "'").replace('‘', "'")
+    forms = {
+        "let's": 'let us', "i'm": 'i am', "you're": 'you are', "we're": 'we are',
+        "they're": 'they are', "don't": 'do not', "doesn't": 'does not',
+        "didn't": 'did not', "can't": 'can not', 'cannot': 'can not',
+        "won't": 'will not', "isn't": 'is not', "aren't": 'are not',
+        "wasn't": 'was not', "weren't": 'were not', "haven't": 'have not',
+        "hasn't": 'has not', "hadn't": 'had not', "wouldn't": 'would not',
+        "shouldn't": 'should not', "couldn't": 'could not',
+        "i'll": 'i will', "you'll": 'you will', "we'll": 'we will',
+        "they'll": 'they will', "he'll": 'he will', "she'll": 'she will',
+        "i've": 'i have', "you've": 'you have', "we've": 'we have', "they've": 'they have',
+    }
+    for contraction, expanded in forms.items():
+        text = re.sub(r"(?<![\w'])" + re.escape(contraction) + r"(?![\w'])", expanded, text)
+    text = re.sub(r"\b(it|that|there|what|here)'s(?=\s+(?:a|an|the|no|not|beside)\b)", r'\1 is', text)
+    return text
+
+
 def matches(phrase: str, quote: str) -> bool:
     """Require all expression words in order, ignoring punctuation and case."""
     def tokenize(text: str) -> list[str]:
@@ -92,8 +117,8 @@ def matches(phrase: str, quote: str) -> bool:
             result.append(''.join(current))
         return result
 
-    tokens = tokenize(phrase)
-    words = tokenize(quote)
+    tokens = tokenize(normalize_contractions(phrase))
+    words = tokenize(normalize_contractions(quote))
     if not tokens:
         return False
     # CJK scripts commonly omit spaces between words; match the continuous
