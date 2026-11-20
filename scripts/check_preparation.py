@@ -57,7 +57,9 @@ def main():
             assert db.due_subscribers(10) == []
             future = db.due_subscribers(preparation.LOOKAHEAD_MINUTES)
             assert len(future) == 1
-            assert preparation.prepare(future, select, explain) == (1,0)
+            initial = preparation.prepare(future, select, explain)
+            print(f'::notice title=Initial preparation::prepared={initial[0]}, failed={initial[1]}', flush=True)
+            assert initial == (1,0)
             assert preparation.ready(future[0])
             # Simulate a different Actions runner: original local media disappears.
             path.unlink()

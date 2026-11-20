@@ -24,5 +24,13 @@ def test_timeout_setup_failure_closes_connection(monkeypatch):
     monkeypatch.setattr(transport.psycopg2, 'connect', connect)
     connect.return_value.cursor.return_value.__enter__.return_value.execute.side_effect = RuntimeError('failed')
     with pytest.raises(RuntimeError):
-        transport.connect_verified('dsn')
+        transport.connect_verified('postgresql://example.com/db')
     connect.return_value.close.assert_called_once()
+
+
+def test_neon_pooler_is_replaced_for_session_schema_and_locks(monkeypatch):
+    connect = MagicMock()
+    monkeypatch.setattr(transport.psycopg2, 'connect', connect)
+    transport.connect_verified('postgresql://user:pass@ep-example-pooler.eu-central-1.aws.neon.tech/db')
+    assert connect.call_args.kwargs['host'] == 'ep-example.eu-central-1.aws.neon.tech'
+    assert connect.call_args.kwargs['sslmode'] == 'verify-full'
