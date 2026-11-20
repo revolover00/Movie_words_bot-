@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import psycopg2
 import psycopg2.extras
-
-from config import config
-from bot_identity import database_schema
 from psycopg2 import sql
+
+from bot_identity import database_schema
+from config import config
 
 log = logging.getLogger(__name__)
 
@@ -81,20 +80,18 @@ def remove_subscriber(chat_id: int) -> None:
 
 def list_subscribers() -> list[dict]:
     """Return all active subscribers."""
-    with connect() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                "SELECT chat_id FROM subscribers WHERE is_active = TRUE ORDER BY chat_id"
-            )
-            return [dict(row) for row in cur.fetchall()]
+    with connect() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT chat_id FROM subscribers WHERE is_active = TRUE ORDER BY chat_id"
+        )
+        return [dict(row) for row in cur.fetchall()]
 
 
 def was_sent(word: str) -> bool:
     """Check whether a word was already sent."""
-    with connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM sent_words WHERE word = %s", (word,))
-            return cur.fetchone() is not None
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM sent_words WHERE word = %s", (word,))
+        return cur.fetchone() is not None
 
 
 def mark_sent(word: str, video_id: str | None, video_title: str | None) -> None:
@@ -112,15 +109,14 @@ def mark_sent(word: str, video_id: str | None, video_title: str | None) -> None:
         conn.commit()
 
 
-def last_sent_word() -> Optional[str]:
+def last_sent_word() -> str | None:
     """Return the most recently sent word, if any."""
-    with connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT word FROM sent_words ORDER BY sent_at DESC LIMIT 1"
-            )
-            row = cur.fetchone()
-            return row[0] if row else None
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT word FROM sent_words ORDER BY sent_at DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
 
 
 if __name__ == "__main__":
@@ -165,24 +161,23 @@ def due_subscribers(lookahead_minutes: int = 0) -> list[dict]:
     This is a scheduling building block, not a delivery claim. The caller must
     serialize scheduling runs and advance a user's due time only after delivery.
     """
-    with connect() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("""
-                SELECT s.chat_id, s.level,
-                       COALESCE(p.learning_language, 'en') AS learning_language,
-                       COALESCE(p.explanation_language, 'ar') AS explanation_language,
-                       COALESCE(p.interval_minutes, 180) AS interval_minutes,
-                       p.updated_at AS settings_updated_at,
-                       COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') AS due_at,
-                       COALESCE(p.ui_language, 'ar') AS ui_language
-                FROM subscribers s
-                LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
-                WHERE s.is_active = TRUE
-                  AND LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'
-                  AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now() + %s * interval '1 minute'
-                ORDER BY COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours'), s.chat_id
-            """, (lookahead_minutes,))
-            return [dict(row) for row in cur.fetchall()]
+    with connect() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT s.chat_id, s.level,
+                   COALESCE(p.learning_language, 'en') AS learning_language,
+                   COALESCE(p.explanation_language, 'ar') AS explanation_language,
+                   COALESCE(p.interval_minutes, 180) AS interval_minutes,
+                   p.updated_at AS settings_updated_at,
+                   COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') AS due_at,
+                   COALESCE(p.ui_language, 'ar') AS ui_language
+            FROM subscribers s
+            LEFT JOIN subscriber_preferences p ON p.chat_id = s.chat_id
+            WHERE s.is_active = TRUE
+              AND LEFT(COALESCE(p.input_state, ''), 6) <> 'setup_'
+              AND COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours') <= now() + %s * interval '1 minute'
+            ORDER BY COALESCE(p.next_due_at, s.subscribed_at + interval '3 hours'), s.chat_id
+        """, (lookahead_minutes,))
+        return [dict(row) for row in cur.fetchall()]
 
 
 def advance_due_after_delivery(chat_id: int, settings_updated_at) -> bool:

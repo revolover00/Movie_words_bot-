@@ -1,7 +1,9 @@
 """Record reported API usage only, never prompts, transcripts, keys or prices."""
 import logging
 import time
+
 from config import config
+
 log = logging.getLogger(__name__)
 
 
@@ -25,6 +27,6 @@ def tracked(operation, request, **kwargs):
                     cur.execute('''INSERT INTO ai_usage(operation,model,status,prompt_tokens,completion_tokens,duration_seconds)
                         VALUES(%s,%s,%s,%s,%s,%s)''', (operation,kwargs.get('model','unknown'),status,
                         count('prompt_tokens'),count('completion_tokens'),time.monotonic()-started))
-            except Exception:
+            except Exception:  # noqa: BLE001 - telemetry must never mask the primary API result
                 # Observability failure must never mask an API response or its original error.
                 log.warning('AI usage recording unavailable')

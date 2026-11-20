@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, Mock
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import psycopg2
 from psycopg2 import sql
+
 import db
 import preparation
 import reliable_delivery
@@ -110,7 +111,7 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - operator entrypoint reports any integration failure
         import traceback
         frame = traceback.extract_tb(error.__traceback__)[-1]
         print(f'::error title=Preparation integration::{type(error).__name__} at {Path(frame.filename).name}:{frame.lineno}', flush=True)
