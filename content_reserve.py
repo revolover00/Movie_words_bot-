@@ -88,5 +88,7 @@ def refill(subscribers, select, explain):
         except Exception as error:
             print(f'::warning title=Reserve refill::{level}/{learning}: {type(error).__name__}', flush=True)
             failed += 1
+    for (level, learning), audience in groups.items():
+        print(f'::notice title=Reserve stock::{level}/{learning}: minimum_ready={min(stock(s) for s in audience)}, target={TARGET}', flush=True)
     print(f'::notice title=Verified lesson reserve::built={built}, failed={failed}, target_per_person={TARGET}', flush=True)
     return built, failed
