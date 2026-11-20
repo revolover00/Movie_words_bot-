@@ -48,3 +48,39 @@ not a penetration test, compliance certification or guarantee of no remaining bu
 - A separate Python dependency vulnerability scan and independent security review
   remain advisable. Copyright permissions for film excerpts remain an operator
   responsibility.
+
+## Operational follow-up
+
+- Preparation now starts up to **30 minutes** before the current slot rather than
+  ten. Only the current slot is prepared; due-time preflight still prevents early
+  sends. This creates more retry opportunities, not a guarantee of provider supply.
+- A read-only aggregate health check fails the daily workflow when eligible users
+  are more than 15 minutes overdue. Production workflow failure opens one GitHub
+  incident, deduplicated until a healthy production run closes it. Alerts contain
+  no subscriber identifiers, secrets or raw logs. GitHub notification delivery
+  depends on repository notification settings. A complete GitHub/external-cron
+  outage cannot be detected by a monitor running on the same service.
+- Python PostgreSQL transport now enforces `verify-full` with the certifi CA bundle,
+  a ten-second connection timeout and a fifteen-second statement timeout. It never
+  falls back to weaker TLS. The isolated database integration uses this transport.
+- Webhook requests no longer execute schema migrations. The explicit **Database
+  migrations** workflow runs for SQL changes on main and supports manual runs.
+  Existing setup/worker initialization remains as a compatibility fallback.
+  For incompatible future schema changes, deploy additive migrations **before**
+  code. Missing schema fails closed; never restore runtime webhook DDL to hide it.
+- Admin login attempts with supplied credentials are throttled in PostgreSQL:
+  twenty tries per IP per fifteen-minute window, shared across instances. A
+  successful login clears its counter. Blocked attempts are rejected before
+  password comparison; valid guesses cannot bypass a locked window. Only salted
+  address hashes are stored; expired rows are cleaned after one day. Vercel's
+  trusted forwarding header is used, never arbitrary X-Forwarded-For. Proxies/NAT
+  can share a counter; distributed attacks still require edge/WAF controls.
+- A PyPI vulnerability scan of the installed Python environment found no known
+  advisories at scan time. This is neither a source-code audit nor protection
+  against future or undisclosed vulnerabilities.
+
+These follow-ups supersede the earlier Python TLS, webhook migration, admin
+throttling and missing Python dependency scan items. Still outside software-only
+closure: provider availability/quotas, external scheduling precision, independent
+penetration testing, rights to media and revocation of previously exposed secrets.
+No automatic replay of uncertain Telegram sends has been introduced.

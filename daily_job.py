@@ -237,7 +237,7 @@ def main() -> None:
         preparation.cleanup()
         subscribers = db.due_subscribers()
         if not subscribers:
-            prepared, failed = preparation.prepare([sub for sub in db.due_subscribers(10) if sub['due_at'] > datetime.now(timezone.utc)], select_localized_clip, localized_caption)
+            prepared, failed = preparation.prepare([sub for sub in db.due_subscribers(preparation.LOOKAHEAD_MINUTES) if sub['due_at'] > datetime.now(timezone.utc)], select_localized_clip, localized_caption)
             db.record_delivery_run('failed' if failed else ('completed' if prepared else 'idle'), 0)
             log.info('Lookahead: %s slots prepared, %s failed', prepared, failed)
             if failed:
@@ -255,7 +255,7 @@ def main() -> None:
                     return media.enter_context(preparation.restore(content, reload_verified_clip))
                 asyncio.run(run(subscribers, Bot(token=config.bot_token), select_localized_clip,
                                 localized_caption, restore_clip, stats, prepared_lookup=preparation.ready, shared_queue=True))
-            prepared, failed = preparation.prepare([sub for sub in db.due_subscribers(10) if sub['due_at'] > datetime.now(timezone.utc)], select_localized_clip, localized_caption)
+            prepared, failed = preparation.prepare([sub for sub in db.due_subscribers(preparation.LOOKAHEAD_MINUTES) if sub['due_at'] > datetime.now(timezone.utc)], select_localized_clip, localized_caption)
             log.info('Lookahead: %s slots prepared, %s failed', prepared, failed)
             status = 'failed' if stats.failed or stats.uncertain or failed else 'completed'
         finally:

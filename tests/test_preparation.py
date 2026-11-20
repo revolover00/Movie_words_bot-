@@ -180,3 +180,11 @@ def test_media_read_is_bounded_even_if_file_grows_after_stat(monkeypatch):
     with pytest.raises(ValueError,match='grew'):
         prep.save_media(1,'growing.mp4')
     stream.read.assert_called_once_with(prep.MAX_ITEM+1)
+
+
+def test_preparation_consistently_uses_thirty_minute_horizon(monkeypatch):
+    setup(monkeypatch)
+    assert prep.LOOKAHEAD_MINUTES == 30
+    prep.prepare([subscriber()], Mock(), Mock())
+    assert prep.db.still_due_with_settings.call_count > 0
+    assert all(call.args[1] == 30 for call in prep.db.still_due_with_settings.call_args_list)

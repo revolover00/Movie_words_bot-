@@ -20,6 +20,7 @@ import db
 import preparation
 import reliable_delivery
 from config import config
+from postgres_connection import connect_verified
 
 
 def main():
@@ -27,10 +28,10 @@ def main():
     schema = 'test_preparation_' + uuid.uuid4().hex
     original = db.connect
     connections = []
-    admin = psycopg2.connect(config.database_url)
+    admin = connect_verified(config.database_url)
 
     def connect():
-        conn = psycopg2.connect(config.database_url)
+        conn = connect_verified(config.database_url)
         connections.append(conn)
         with conn.cursor() as cur:
             cur.execute(sql.SQL('SET search_path TO {}').format(sql.Identifier(schema)))
@@ -44,7 +45,7 @@ def main():
         db.init_db()
         with db.session() as conn, conn.cursor() as cur:
             cur.execute("INSERT INTO subscribers(chat_id,level) VALUES(1,'B1')")
-            cur.execute("INSERT INTO subscriber_preferences(chat_id,next_due_at,interval_minutes) VALUES(1,now()+interval '5 minutes',30)")
+            cur.execute("INSERT INTO subscriber_preferences(chat_id,next_due_at,interval_minutes) VALUES(1,now()+interval '25 minutes',30)")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'fixture.mp4'
             path.write_bytes(b'previously-verified-media-fixture')
@@ -52,7 +53,8 @@ def main():
                 SimpleNamespace(path=path,clip_id='fixture',title='Fixture',url='https://example.com/fixture')))
             explain = Mock(return_value='Fixture explanation')
             assert db.due_subscribers() == []
-            future = db.due_subscribers(10)
+            assert db.due_subscribers(10) == []
+            future = db.due_subscribers(preparation.LOOKAHEAD_MINUTES)
             assert len(future) == 1
             assert preparation.prepare(future, select, explain) == (1,0)
             assert preparation.ready(future[0])

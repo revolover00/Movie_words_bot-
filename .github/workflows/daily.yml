@@ -64,3 +64,27 @@ jobs:
           VERIFY_AUTH: 'true'
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: python scripts/check_webhook.py
+
+      - name: Check overdue delivery health
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: python scripts/check_delivery_health.py
+
+  alert:
+    # Branch validation/manual probes must not open or close production incidents.
+    if: ${{ always() && github.ref == 'refs/heads/main' && needs.send.result != 'skipped' }}
+    needs: send
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update delivery incident
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DELIVERY_RESULT: ${{ needs.send.result }}
+          DELIVERY_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 scripts/delivery_alert.py
