@@ -55,7 +55,8 @@ not a penetration test, compliance certification or guarantee of no remaining bu
   ten. Only the current slot is prepared; due-time preflight still prevents early
   sends. This creates more retry opportunities, not a guarantee of provider supply.
 - A read-only aggregate health check fails the daily workflow when eligible users
-  are more than 15 minutes overdue. Production workflow failure opens one GitHub
+  are more than 15 minutes overdue, or uncertain/stale in-flight sends remain
+  unresolved. No automatic replay or resolution is performed. Production workflow failure opens one GitHub
   incident, deduplicated until a healthy production run closes it. Alerts contain
   no subscriber identifiers, secrets or raw logs. GitHub notification delivery
   depends on repository notification settings. A complete GitHub/external-cron

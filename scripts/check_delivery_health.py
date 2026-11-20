@@ -18,9 +18,13 @@ def check():
             AND COALESCE(p.next_due_at,s.subscribed_at+interval '3 hours')
                 < now()-interval '15 minutes'""")
         overdue = cur.fetchone()[0]
-    print(f'::notice title=Delivery health::overdue_beyond_15_minutes={overdue}', flush=True)
-    if overdue:
-        raise RuntimeError('Subscriptions overdue beyond grace period; inspect private dashboard')
+        cur.execute("""SELECT count(*) FROM delivery_attempts
+            WHERE status='uncertain' OR (status='sending'
+                AND updated_at < now()-interval '15 minutes')""")
+        unresolved = cur.fetchone()[0]
+    print(f'::notice title=Delivery health::overdue_beyond_15_minutes={overdue}, unresolved_sends={unresolved}', flush=True)
+    if overdue or unresolved:
+        raise RuntimeError('Subscriptions overdue or sends unresolved; inspect private dashboard')
 
 
 if __name__ == '__main__':

@@ -12,7 +12,7 @@ def test_overdue_monitor_is_aggregate_read_only_and_fails_closed(monkeypatch):
     cur = conn.__enter__.return_value.cursor.return_value.__enter__.return_value
     cur.fetchone.return_value = (0,)
     health.check()
-    sql = cur.execute.call_args.args[0]
+    sql = cur.execute.call_args_list[0].args[0]
     assert 'SELECT count(*)' in sql and "interval '15 minutes'" in sql
     assert 's.is_active' in sql and 'setup_' in sql
     cur.fetchone.return_value = (1,)
@@ -47,3 +47,13 @@ def test_recovery_closes_only_marked_bot_incidents(monkeypatch):
     monkeypatch.setattr(alert, 'gh', gh)
     alert.reconcile(False, 'run')
     assert len(calls) == 2 and calls[-1][:3] == ('issue', 'close', '42')
+
+
+def test_unresolved_send_keeps_incident_open_without_replay(monkeypatch):
+    conn = MagicMock()
+    monkeypatch.setattr(health.db, 'session', lambda: conn)
+    cur = conn.__enter__.return_value.cursor.return_value.__enter__.return_value
+    cur.fetchone.side_effect = [(0,), (1,)]
+    with pytest.raises(RuntimeError, match='unresolved'):
+        health.check()
+    assert all(call.args[0].lstrip().startswith('SELECT') for call in cur.execute.call_args_list)
