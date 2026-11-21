@@ -40,6 +40,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Verify required delivery capabilities
+        run: python release_contract.py
+
       - name: Install Python dependencies and bundled FFmpeg
         run: pip install -r requirements.txt
 

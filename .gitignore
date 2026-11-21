@@ -25,3 +25,6 @@ node_modules/
 .tgcloud/
 .env.*
 !.env.example
+
+# Local investigation artifacts
+.cache/

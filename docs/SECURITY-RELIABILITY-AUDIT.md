@@ -141,3 +141,29 @@ The database migration workflow includes a two-connection, randomly namespaced
 check: session settings survive commits independently, a simultaneous lock is
 refused, and disconnecting its owner releases it. This does not touch subscriber
 tables or actual worker lock keys.
+
+## Production regression after repository history replacement
+
+The later production failure ran commit `a845c1acb1d4ea923ef450c67375a0873a8b9a76`,
+whose history no longer shared an ancestor with the deployed reliability release
+`e037c3a767c61bf8811cfb6718cba8a946a45817` (GitHub compare returned no common
+ancestor). Its tree had removed the reserve, transcript cache, session transport,
+health/alert steps and multiple security/regression tests. The latest failure also
+showed unsuccessful C2 content search and provider HTTP 429 responses. The record
+does not identify who changed history, and deleting a merged feature branch alone
+cannot produce that change to main.
+
+The recovery is based on the current main history, preserves its newer README,
+and restores the verified reliability implementation and tests without an
+unrelated-history merge. A release capability contract now runs in CI and before
+production delivery to reject accidental partial rollback. Its fingerprint is
+printed in workflow annotations. It is not tamper-proof: a whole-history rewrite
+can remove the check as well.
+
+Attempts to read branch protection and to create a main ruleset blocking force
+push/deletion returned HTTP 403 `Resource not accessible by integration`. No
+branch protection was enabled by this session. Repository owner action remains
+required: Settings → Rules → Rulesets, target `main`, active enforcement, block
+force pushes and deletions; require pull requests and the `test` check. Restrict
+bypass actors. Until that is done, repository-side prevention of another history
+replacement is NOT complete.
